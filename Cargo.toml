@@ -1,0 +1,8 @@
+[package]
+name = "sdfperf_rs"
+version = "0.1.0"
+authors = ["Michael Walczyk <mwalczyk2@gmail.com>"]
+
+[dependencies]
+gl = "0.6.5"
+glutin = "0.10.1"
