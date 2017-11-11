@@ -6,3 +6,4 @@ authors = ["Michael Walczyk <mwalczyk2@gmail.com>"]
 [dependencies]
 gl = "0.6.5"
 glutin = "0.10.1"
+cgmath = "0.15.0"
