@@ -1,10 +1,11 @@
 extern crate gl;
-
-use cgmath::Vector2;
-use cgmath::Matrix4;
+extern crate cgmath;
 
 use program::Program;
+
 use gl::types::*;
+use cgmath::{ Matrix, Matrix4, One, PerspectiveFov, Point2, Vector2, Point3, Vector3 };
+
 use std::mem;
 use std::ffi::CString;
 
@@ -38,25 +39,32 @@ pub struct Graph<'a> {
 impl<'a> Graph<'a> {
 
     pub fn new() -> Graph<'a> {
-        static VERTEX_DATA: [GLfloat; 6] = [ 0.0,  0.5,
-            0.5, -0.5,
-            -0.5, -0.5];
+        static VERTEX_DATA: [GLfloat; 12] = [
+            // First triangle
+            0.0, 0.0,   // UL
+            1.0, 0.0,   // UR
+            0.0, 1.0,   // LL
+
+            // Second triangle
+            1.0, 0.0,   // UR
+            1.0, 1.0,   // LR
+            0.0, 1.0    // LL
+        ];
 
         static VS_SRC: &'static str = "
         #version 430
         layout(location = 0) in vec2 position;
+        uniform mat4 u_model_matrix;
+        uniform mat4 u_projection_matrix;
         void main() {
-            gl_Position = vec4(position, 0.0, 1.0);
+            gl_Position = u_projection_matrix * u_model_matrix * vec4(position, 0.0, 1.0);
         }";
 
         static FS_SRC: &'static str = "
         #version 430
-        uniform float u_time;
         out vec4 o_color;
         void main() {
-            float pct = sin(u_time) * 0.5 + 0.5;
-
-            o_color = vec4(pct, 1.0, 1.0, 1.0);
+            o_color = vec4(1.0, 1.0, 1.0, 1.0);
         }";
 
         let operators: Vec<Operator> = vec![];
@@ -105,10 +113,33 @@ impl<'a> Graph<'a> {
     pub fn draw(&self) {
         self.render_program.bind();
 
+
+
+        // L, R, B, T, N, F
+        let projection: Matrix4<f32> = cgmath::ortho(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
+
+        self.render_program.unifrom_matrix_4fv("u_projection_matrix", &projection);
+
         for op in self.operators.iter() {
+            let translation = Matrix4::from_translation(
+                Vector3::new(
+                    op.screen_position.x,
+                    op.screen_position.y,
+                    0.0)
+            );
+
+            let scale = Matrix4::from_nonuniform_scale(
+                    op.screen_size.x,
+                    op.screen_size.y,
+                    0.0
+            );
+            let model = translation * scale;
+
+            self.render_program.unifrom_matrix_4fv("u_model_matrix", &model);
+
             unsafe {
                 gl::BindVertexArray(self.render_vao);
-                gl::DrawArrays(gl::TRIANGLES, 0, 3);
+                gl::DrawArrays(gl::TRIANGLES, 0, 6);
             }
         }
 

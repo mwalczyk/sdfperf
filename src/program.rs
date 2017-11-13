@@ -1,6 +1,9 @@
 extern crate gl;
+extern crate cgmath;
 
 use gl::types::*;
+use cgmath::{ Matrix, Matrix4, One, PerspectiveFov, Point3, Vector3 };
+
 use std::ptr;
 use std::str;
 use std::ffi::CString;
@@ -113,10 +116,17 @@ impl<'a> Program<'a> {
         unsafe { gl::UseProgram(0); }
     }
 
-    pub fn uniform1f(&self, name: &str, value: f64) {
+    pub fn uniform_1f(&self, name: &str, value: f64) {
         unsafe {
             let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniform1f(self.program_id, location, value as gl::types::GLfloat);
+        }
+    }
+
+    pub fn unifrom_matrix_4fv(&self, name: &str, value: &cgmath::Matrix4<f32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniformMatrix4fv(self.program_id, location, 1, gl::FALSE, value.as_ptr());
         }
     }
 }
