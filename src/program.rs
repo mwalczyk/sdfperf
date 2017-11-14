@@ -2,7 +2,7 @@ extern crate gl;
 extern crate cgmath;
 
 use gl::types::*;
-use cgmath::{ Matrix, Matrix4, One, PerspectiveFov, Point3, Vector3 };
+use cgmath::{ Array, Matrix, Matrix4, One, PerspectiveFov, Point3, Vector3, Vector4 };
 
 use std::ptr;
 use std::str;
@@ -116,14 +116,28 @@ impl<'a> Program<'a> {
         unsafe { gl::UseProgram(0); }
     }
 
-    pub fn uniform_1f(&self, name: &str, value: f64) {
+    pub fn uniform_1f(&self, name: &str, value: f32) {
         unsafe {
             let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniform1f(self.program_id, location, value as gl::types::GLfloat);
         }
     }
 
-    pub fn unifrom_matrix_4fv(&self, name: &str, value: &cgmath::Matrix4<f32>) {
+    pub fn uniform_3f(&self, name: &str, value: &cgmath::Vector3<f32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform3fv(self.program_id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn uniform_4f(&self, name: &str, value: &cgmath::Vector4<f32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform4fv(self.program_id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn unifrom_matrix_4f(&self, name: &str, value: &cgmath::Matrix4<f32>) {
         unsafe {
             let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniformMatrix4fv(self.program_id, location, 1, gl::FALSE, value.as_ptr());

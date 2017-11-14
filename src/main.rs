@@ -1,3 +1,8 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(unreachable_code)]
+
 extern crate gl;
 extern crate glutin;
 extern crate cgmath;
@@ -31,33 +36,64 @@ fn main() {
 
     let mut graph = Graph::new();
     let now = SystemTime::now();
-    let mut mouse_position = (0.0, 0.0);
-    let mut clicked_mouse_position = (0.0, 0.0);
+    let mut mouse_position: (f32, f32) = (0.0, 0.0);
+    let mut clicked_mouse_position: (f32, f32) = (0.0, 0.0);
+    let mut current_zoom = 1.0;
 
-    events_loop.run_forever(|event| {
+    loop {
+        events_loop.poll_events(|event| {
+            match event {
+                glutin::Event::WindowEvent { event, .. } => match event {
+                    glutin::WindowEvent::Closed => (),
+                    glutin::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
+                    glutin::WindowEvent::MouseMoved { position, .. } => {
+                        // Store mouse position
+                        mouse_position = (position.0 as f32, position.1 as f32);
+                        if let Some(window_size) = gl_window.get_inner_size_pixels() {
+                            mouse_position.0 = mouse_position.0 - (window_size.0 / 2) as f32;
+                            mouse_position.1 = mouse_position.1 - (window_size.1 / 2) as f32;
+                        }
+                    },
+                    glutin::WindowEvent::MouseWheel {delta, .. } => {
+                        if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
+                            if line_y == 1.0 {
+                                current_zoom += 0.05;
+                            }
+                            else {
+                                current_zoom -= 0.05;
+                            }
+                            graph.set_network_zoom(current_zoom);
+                        }
+                    },
+                    glutin::WindowEvent::MouseInput { state, .. } => {
+                        // Check if any operator was selected and store the click position
+                        if let glutin::ElementState::Pressed = state {
+                            clicked_mouse_position = (mouse_position.0 as f32, mouse_position.1 as f32);
+                            clicked_mouse_position.0 *= current_zoom;
+                            clicked_mouse_position.1 *= current_zoom;
 
-        use glutin::{ControlFlow, Event, WindowEvent};
+                            graph.check_selected(clicked_mouse_position);
+                        }
+                    },
+                    glutin::WindowEvent::KeyboardInput { input, .. } => {
+                        // `a` adds a new operator to the graph
+                        if let glutin::ElementState::Pressed = input.state {
+                            if input.scancode == 30 {
+                                const OPERATOR_SIZE: (f32, f32) = (100.0, 50.0);
 
-        match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                glutin::WindowEvent::Closed => return glutin::ControlFlow::Break,
-                glutin::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
-                glutin::WindowEvent::MouseMoved{device_id, position} => {
-                    mouse_position = position;
-                },
-                glutin::WindowEvent::MouseInput{device_id, state, button} => {
-                    if let glutin::ElementState::Pressed = state {
-                        clicked_mouse_position = mouse_position;
-                        println!("{:?}", clicked_mouse_position);
-                        graph.add_operator(Vector2::new(clicked_mouse_position.0 as f32,
-                                                                      clicked_mouse_position.1 as f32),
-                                           Vector2::new(100.0, 50.0));
+                                graph.add_operator(Vector2::new(mouse_position.0 - OPERATOR_SIZE.0 / 2.0,
+                                                                            mouse_position.1 - OPERATOR_SIZE.1 / 2.0),
+                                                   Vector2::new(OPERATOR_SIZE.0, OPERATOR_SIZE.1));
+
+                                graph.check_selected(mouse_position);
+                            }
+                        }
                     }
+                    _ => (),
                 },
-                _ => (),
-            },
-            _ => ()
-        }
+                _ => ()
+            }
+        });
 
         unsafe {
             gl::ClearColor(0.3, 0.3, 0.3, 1.0);
@@ -65,12 +101,10 @@ fn main() {
 
             let elapsed = now.elapsed().unwrap();
             let ms = elapsed.as_secs() * 1000 + elapsed.subsec_nanos() as u64 / 1_000_000;
+
             graph.draw();
         }
 
         gl_window.swap_buffers().unwrap();
-
-        ControlFlow::Continue
-    });
-
+    }
 }
