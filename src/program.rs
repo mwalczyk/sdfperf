@@ -137,7 +137,7 @@ impl<'a> Program<'a> {
         }
     }
 
-    pub fn unifrom_matrix_4f(&self, name: &str, value: &cgmath::Matrix4<f32>) {
+    pub fn uniform_matrix_4f(&self, name: &str, value: &cgmath::Matrix4<f32>) {
         unsafe {
             let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniformMatrix4fv(self.program_id, location, 1, gl::FALSE, value.as_ptr());
