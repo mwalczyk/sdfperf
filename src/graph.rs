@@ -329,7 +329,6 @@ impl<'a> Graph<'a> {
         // Draw operators
         self.draw_operators();
     }
-
 }
 
 impl<'a> Drop for Graph<'a> {

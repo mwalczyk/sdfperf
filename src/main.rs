@@ -10,6 +10,8 @@ extern crate cgmath;
 mod program;
 mod operator;
 mod graph;
+mod bounding_rect;
+
 use operator::Operator;
 use graph::Graph;
 use program::Program;

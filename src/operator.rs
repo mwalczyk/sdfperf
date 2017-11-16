@@ -1,89 +1,33 @@
 use program::Program;
+use bounding_rect::BoundingRect;
 
-use cgmath::{ Matrix, Matrix4, One, PerspectiveFov, Point2, Vector2, Point3, Vector3, Vector4 };
+use cgmath::{ Vector2 };
 
-struct OperatorInfo {
+struct OpInfo {
+    // A unique, numeric identifier
     uuid: usize,
+
+    // The maximum number of operators that can be connected to this operator
+    input_capacity: usize,
+
+    // The user-defined name of this operator
     name: String,
-    // ...
+}
+
+enum OpType {
+    Generator,
+    Combination,
+    Data,
+    Deformation,
+    Render
 }
 
 trait Op {
-    fn compute(&self) {
+    fn compute(&self) -> bool;
 
-    }
+    fn get_op_info(&self) -> OpInfo;
 
-    fn get_shader_code(&self) -> String {
-        "test".to_string()
-    }
-}
-
-// Render Root
-//
-// Generators:
-// - Sphere
-// - Cube
-// - Plane
-//
-// Mergers:
-// - Union
-// - Intersect
-// - Smooth minimum
-//
-// Deformers:
-// - Noise
-// - Sin
-// - Cos
-//
-// Data:
-// - Time
-// - FFT
-// - OSC
-// - MIDI
-#[derive(PartialEq)]
-pub struct BoundingRect {
-    pub upper_left: Vector2<f32>,
-    pub size: Vector2<f32>
-}
-
-impl BoundingRect {
-    pub fn new(upper_left: Vector2<f32>, size: Vector2<f32>) -> BoundingRect {
-        BoundingRect { upper_left, size }
-    }
-
-    pub fn inside(&self, point: &Vector2<f32>) -> bool {
-        if point.x > self.upper_left.x && point.x < (self.upper_left.x + self.size.x) &&
-           point.y > self.upper_left.y && point.y < (self.upper_left.y + self.size.y) {
-            return true;
-        }
-        false
-    }
-
-    pub fn inside_with_padding(&self, point: &Vector2<f32>, padding: f32) -> bool {
-        if point.x > (self.upper_left.x - padding) && point.x < (self.upper_left.x + self.size.x + padding) &&
-           point.y > (self.upper_left.y - padding) && point.y < (self.upper_left.y + self.size.y + padding) {
-            return true;
-        }
-        false
-    }
-
-    pub fn centroid(&self) -> Vector2<f32> {
-        Vector2::new(self.upper_left.x + self.size.x * 0.5,
-                     self.upper_left.y + self.size.y * 0.5)
-    }
-
-    pub fn get_model_matrix(&self) -> Matrix4<f32> {
-        let translation = Matrix4::from_translation(
-            Vector3::new(
-                self.upper_left.x,
-                self.upper_left.y,
-                0.0)
-        );
-
-        let scale = Matrix4::from_nonuniform_scale(self.size.x, self.size.y, 0.0);
-
-        translation * scale
-    }
+    fn get_op_type(&self) -> OpType;
 }
 
 pub enum InteractionState {
@@ -93,7 +37,7 @@ pub enum InteractionState {
     ConnectDestination
 }
 
-static REGION_SLOT_SIZE: f32 = 12.0;
+static REGION_SLOT_SIZE: f32 = 6.0;
 
 pub struct Operator {
     pub input_connection_ids: Vec<usize>,
@@ -107,16 +51,29 @@ pub struct Operator {
 impl Operator {
 
     pub fn new(upper_left: Vector2<f32>, size: Vector2<f32>) -> Operator {
+        // The bounding region of the operator itself
+        let region_operator = BoundingRect::new(upper_left, size);
+
+        // The small bounding region of the input connection slot for this operator
+        let region_slot_input = BoundingRect::new(Vector2::new(upper_left.x - REGION_SLOT_SIZE * 0.5, upper_left.y + size.y * 0.5 - REGION_SLOT_SIZE * 0.5),
+                                                              Vector2::new(REGION_SLOT_SIZE, REGION_SLOT_SIZE));
+
+        // The small bounding region of the output connection slot for this operator
+        let region_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - REGION_SLOT_SIZE * 0.5, upper_left.y + size.y * 0.5 - REGION_SLOT_SIZE * 0.5),
+                                                               Vector2::new(REGION_SLOT_SIZE, REGION_SLOT_SIZE));
         Operator {
             input_connection_ids: vec![],
             output_connection_ids: vec![],
-            region_operator: BoundingRect::new(upper_left, size),
-            region_slot_input: BoundingRect::new(Vector2::new(upper_left.x - 6.0 * 0.5, upper_left.y + size.y * 0.5 - 6.0 * 0.5),
-                                                 Vector2::new(6.0, 6.0)),
-            region_slot_output: BoundingRect::new(Vector2::new(upper_left.x + size.x - 6.0 * 0.5, upper_left.y + size.y * 0.5 - 6.0 * 0.5),
-                                                  Vector2::new(6.0, 6.0)),
+            region_operator,
+            region_slot_input,
+            region_slot_output,
             state: InteractionState::Selected
         }
+    }
+
+    pub fn connect_to(&mut self, other: &mut Operator) {
+        //self.output_connection_ids.push(other.id);
+        //other.input_connection_ids.push(self.id);
     }
 
     pub fn set_screen_position(&mut self, position: &Vector2<f32>) {

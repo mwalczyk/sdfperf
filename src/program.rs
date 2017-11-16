@@ -1,17 +1,22 @@
-extern crate gl;
-extern crate cgmath;
-
+use gl;
 use gl::types::*;
-use cgmath::{ Array, Matrix, Matrix4, One, PerspectiveFov, Point3, Vector3, Vector4 };
+
+use cgmath;
+use cgmath::{ Array, Matrix, Matrix4, Vector2, Vector3, Vector4 };
 
 use std::ptr;
 use std::str;
 use std::ffi::CString;
 
+pub struct UniformEntry {
+    name: String,
+    location: GLint
+}
+
 pub struct Program<'a> {
     pub program_id: GLuint,
-    vertex_shader_src: &'a str,
-    fragment_shader_src: &'a str
+    vert_shader_src: &'a str,
+    frag_shader_src: &'a str
 }
 
 impl<'a> Program<'a> {
@@ -95,16 +100,20 @@ impl<'a> Program<'a> {
         }
     }
 
-    pub fn new(vertex_shader_src: &'a str, fragment_shader_src: &'a str) -> Program<'a> {
+    fn perform_reflection(src: &str) {
 
-        let vertex_shader_id = Program::compile_shader(vertex_shader_src, gl::VERTEX_SHADER);
-        let fragment_shader_id = Program::compile_shader(fragment_shader_src, gl::FRAGMENT_SHADER);
-        let program_id = Program::link_program(vertex_shader_id, fragment_shader_id);
+    }
+
+    pub fn new(vert_shader_src: &'a str, frag_shader_src: &'a str) -> Program<'a> {
+
+        let vert_shader_id = Program::compile_shader(vert_shader_src, gl::VERTEX_SHADER);
+        let frag_shader_id = Program::compile_shader(frag_shader_src, gl::FRAGMENT_SHADER);
+        let program_id = Program::link_program(vert_shader_id, frag_shader_id);
 
         Program {
             program_id,
-            vertex_shader_src,
-            fragment_shader_src
+            vert_shader_src,
+            frag_shader_src
         }
     }
 
@@ -120,6 +129,13 @@ impl<'a> Program<'a> {
         unsafe {
             let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniform1f(self.program_id, location, value as gl::types::GLfloat);
+        }
+    }
+
+    pub fn uniform_2f(&self, name: &str, value: &cgmath::Vector2<f32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform2fv(self.program_id, location, 1, value.as_ptr());
         }
     }
 
@@ -147,8 +163,6 @@ impl<'a> Program<'a> {
 
 impl<'a> Drop for Program<'a> {
     fn drop(&mut self) {
-        unsafe {
-            gl::DeleteProgram(self.program_id);
-        }
+        unsafe { gl::DeleteProgram(self.program_id); }
     }
 }
