@@ -62,7 +62,7 @@ fn main() {
                             mouse_position.y *= current_zoom;
                         }
 
-                        graph.check_selected(mouse_position, mouse_down);
+                        graph.handle_interaction(mouse_position, mouse_down);
                     },
                     glutin::WindowEvent::MouseWheel {delta, .. } => {
                         if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
@@ -81,7 +81,7 @@ fn main() {
                             clicked_mouse_position = mouse_position;
                             mouse_down = true;
 
-                            graph.check_selected(clicked_mouse_position, mouse_down);
+                            graph.handle_interaction(clicked_mouse_position, mouse_down);
                         }
                         else {
                             mouse_down = false;
@@ -97,7 +97,7 @@ fn main() {
                                                                             mouse_position.y - OPERATOR_SIZE.1 / 2.0),
                                                    Vector2::new(OPERATOR_SIZE.0, OPERATOR_SIZE.1));
 
-                                graph.check_selected(mouse_position, mouse_down);
+                                graph.handle_interaction(mouse_position, mouse_down);
                             }
                         }
                     }
@@ -108,7 +108,7 @@ fn main() {
         });
 
         unsafe {
-            gl::ClearColor(0.3, 0.3, 0.3, 1.0);
+            gl::ClearColor(0.15, 0.15, 0.15, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
             let elapsed = now.elapsed().unwrap();
