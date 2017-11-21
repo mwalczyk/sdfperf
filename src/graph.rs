@@ -227,7 +227,6 @@ impl<'a> Graph<'a> {
                     (self.connections_point_cache.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
                     self.connections_point_cache.as_ptr() as *const c_void
                 );
-                gl::Flush();
             }
             self.connections_need_update = false;
         }
