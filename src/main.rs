@@ -6,6 +6,7 @@
 extern crate gl;
 extern crate glutin;
 extern crate cgmath;
+extern crate uuid;
 
 mod program;
 mod operator;

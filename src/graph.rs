@@ -164,6 +164,7 @@ impl Graph {
 
     pub fn add_operator(&mut self, screen_position: Vector2<f32>, screen_size: Vector2<f32>) {
         self.operators.push(Operator::new(screen_position, screen_size));
+        println!("Created new op with UUID: {:?}", self.operators.last().unwrap().id);
     }
 
     fn draw_operator(&self, op: &Operator) {
@@ -182,6 +183,7 @@ impl Graph {
         unsafe {
             gl::BindVertexArray(self.render_vao);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
+
         }
 
         // Draw the connection slot, if necessary

@@ -2,6 +2,8 @@ use program::Program;
 use bounding_rect::BoundingRect;
 
 use cgmath::{ Vector2, Vector3 };
+use uuid::Uuid;
+use uuid::*;
 
 static REGION_SLOT_SIZE: f32 = 6.0;
 
@@ -59,11 +61,22 @@ impl OpType {
         }
     }
 
+    /// Returns the maximum number of ops that can be connected to this
+    /// op's input slot.
     pub fn get_input_capacity(&self) -> usize {
         match *self {
             OpType::Sphere | OpType::Box | OpType::Plane => 0,
             OpType::Union | OpType::Intersection | OpType::SmoothMinimum => 2,
             OpType::Render => 1
+        }
+    }
+
+    /// Returns `true` if this op's output slot can be connected to another
+    /// op's input slot and `false` otherwise.
+    pub fn has_output(&self) -> bool {
+        match *self {
+            OpType::Render => false,
+            _ => true
         }
     }
 
@@ -93,8 +106,8 @@ trait Op {
 
     fn get_formatted_shader_code(&self) -> String;
 
-    // Returns the number of ops that are connected to this
-    // op in the current graph
+    /// Returns the number of ops that are connected to this
+    /// op in the current graph
     fn get_number_of_active_inputs(&self) -> usize {
         self.get_op_info().input_connection_ids.len()
     }
@@ -154,7 +167,8 @@ pub struct Operator {
     pub region_operator: BoundingRect,
     pub region_slot_input: BoundingRect,
     pub region_slot_output: BoundingRect,
-    pub state: InteractionState
+    pub state: InteractionState,
+    pub id: Uuid
 }
 
 impl Operator {
@@ -176,7 +190,8 @@ impl Operator {
             region_operator,
             region_slot_input,
             region_slot_output,
-            state: InteractionState::Selected
+            state: InteractionState::Selected,
+            id: Uuid::new_v4()
         }
     }
 
