@@ -1,8 +1,8 @@
 use gl;
 use gl::types::*;
 
-use cgmath;
-use cgmath::{ Matrix, Matrix4, One, PerspectiveFov, Point2, Vector2, Point3, Vector3, Vector4 };
+use cgmath::{self, Matrix, Matrix4, One, PerspectiveFov, Point2, Vector2, Point3, Vector3, Vector4, Zero };
+use uuid::Uuid;
 
 use std::mem;
 use std::ptr;
@@ -14,23 +14,22 @@ use program::Program;
 use operator::Operator;
 use operator::InteractionState;
 
-static NETWORK_WIDTH: f32 = 800.0;
-static NETWORK_HEIGHT: f32 = 600.0;
 type Color = Vector4<f32>;
 
 pub struct Graph {
     operators: Vec<Operator>,
-    connections: HashSet<(usize, usize)>,
+    connections: HashSet<(Uuid, Uuid)>,
     render_program_operators: Program,
     render_program_connections: Program,
     render_projection_matrix: Matrix4<f32>,
-    render_vao: u32,
-    render_vbo: u32,
+    render_vao_operators: u32,
+    render_vbo_operators: u32,
     render_vao_connections: u32,
     render_vbo_connections: u32,
     connections_point_cache: Vec<GLfloat>,
     connections_need_update: bool,
-    network_zoom: f32
+    network_zoom: f32,
+    network_resolution: Vector2<f32>
 }
 
 impl Graph {
@@ -84,23 +83,17 @@ impl Graph {
         let render_program_operators = Program::new(VS_SRC_OP.to_string(), FS_SRC_OP.to_string());
         let render_program_connections = Program::new(VS_SRC_CN.to_string(), FS_SRC_CN.to_string());
 
-        // L, R, B, T, N, F
-        let render_projection_matrix: Matrix4<f32> = cgmath::ortho(-(NETWORK_WIDTH * 0.5),
-                                                                (NETWORK_WIDTH * 0.5),
-                                                                (NETWORK_HEIGHT * 0.5),
-                                                                -(NETWORK_HEIGHT * 0.5),
-                                                                -1.0,
-                                                                1.0);
-        let mut render_vao = 0;
-        let mut render_vbo = 0;
+
+        let mut render_vao_operators = 0;
+        let mut render_vbo_operators = 0;
         let mut render_vao_connections = 0;
         let mut render_vbo_connections = 0;
 
         unsafe {
-            // Set up GL objects for rendering operators
-            gl::CreateBuffers(1, &mut render_vbo);
+            // Set up OpenGL objects for rendering operators.
+            gl::CreateBuffers(1, &mut render_vbo_operators);
             gl::NamedBufferData(
-                render_vbo,
+                render_vbo_operators,
                 (VERTEX_DATA.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
                 mem::transmute(&VERTEX_DATA[0]),
                 gl::STATIC_DRAW,
@@ -108,14 +101,14 @@ impl Graph {
 
             let mut pos_attr = gl::GetAttribLocation(render_program_operators.program_id, CString::new("position").unwrap().as_ptr());
 
-            gl::CreateVertexArrays(1, &mut render_vao);
-            gl::EnableVertexArrayAttrib(render_vao, pos_attr as GLuint);
-            gl::VertexArrayAttribFormat(render_vao, pos_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, 0);
-            gl::VertexArrayAttribBinding(render_vao, pos_attr as GLuint, 0);
+            gl::CreateVertexArrays(1, &mut render_vao_operators);
+            gl::EnableVertexArrayAttrib(render_vao_operators, pos_attr as GLuint);
+            gl::VertexArrayAttribFormat(render_vao_operators, pos_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, 0);
+            gl::VertexArrayAttribBinding(render_vao_operators, pos_attr as GLuint, 0);
 
-            gl::VertexArrayVertexBuffer(render_vao, 0, render_vbo, 0, (2 * mem::size_of::<GLfloat>()) as i32);
+            gl::VertexArrayVertexBuffer(render_vao_operators, 0, render_vbo_operators, 0, (2 * mem::size_of::<GLfloat>()) as i32);
 
-            // Set up GL objects for rendering connections
+            // Set up OpenGL objects for rendering connections.
             pos_attr = gl::GetAttribLocation(render_program_connections.program_id, CString::new("position").unwrap().as_ptr());
 
             gl::CreateBuffers(1, &mut render_vbo_connections);
@@ -134,40 +127,52 @@ impl Graph {
             gl::VertexArrayVertexBuffer(render_vao_connections, 0, render_vbo_connections, 0, (2 * mem::size_of::<GLfloat>()) as i32);
         }
 
-        Graph {
-            operators: vec![],
+        let mut graph = Graph {
+            operators: Vec::new(),
             connections: HashSet::new(),
             render_program_operators,
             render_program_connections,
-            render_projection_matrix,
-            render_vao,
-            render_vbo,
+            render_projection_matrix: Matrix4::zero(),
+            render_vao_operators,
+            render_vbo_operators,
             render_vao_connections,
             render_vbo_connections,
-            connections_point_cache: vec![],
+            connections_point_cache: Vec::new(),
             connections_need_update: false,
-            network_zoom: 1.0
-        }
+            network_zoom: 1.0,
+            network_resolution: Vector2::new(800.0, 600.0)
+        };
+
+        // Initialize the projection matrix.
+        graph.set_network_zoom(1.0);
+
+        graph
     }
 
+    /// Zooms the network in or out by modifying the underlying
+    /// projection matrix. If `network_zoom` is `1.0`, this is
+    /// effectively the "home" position.
     pub fn set_network_zoom(&mut self, network_zoom: f32) {
         self.network_zoom = network_zoom;
 
-        // Rebuild the projection matrix.
-        self.render_projection_matrix = cgmath::ortho(-(NETWORK_WIDTH * 0.5) * self.network_zoom,
-                                                      (NETWORK_WIDTH * 0.5) * self.network_zoom,
-                                                      (NETWORK_HEIGHT * 0.5) * self.network_zoom,
-                                                      -(NETWORK_HEIGHT * 0.5) * self.network_zoom,
+        // Rebuild the projection matrix:
+        // L, R, B, T, N, F
+        self.render_projection_matrix = cgmath::ortho(-(self.network_resolution.x * 0.5) * self.network_zoom,
+                                                      (self.network_resolution.x * 0.5) * self.network_zoom,
+                                                      (self.network_resolution.y * 0.5) * self.network_zoom,
+                                                      -(self.network_resolution.y * 0.5) * self.network_zoom,
                                                       -1.0,
                                                       1.0);
     }
 
+    /// Adds a new op to the network at coordinates `screen_position`
+    /// and dimensions `screen_size`.
     pub fn add_operator(&mut self, screen_position: Vector2<f32>, screen_size: Vector2<f32>) {
         self.operators.push(Operator::new(screen_position, screen_size));
-        println!("Created new op with UUID: {:?}", self.operators.last().unwrap().id);
     }
 
-    fn draw_operator(&self, op: &Operator) {
+    /// Draws a single op in the network.
+    fn draw_op(&self, op: &Operator) {
         let mut model_matrix = op.region_operator.get_model_matrix();
 
         // Pick a draw color based on the current interaction state of this operator
@@ -181,7 +186,7 @@ impl Graph {
         self.render_program_operators.uniform_4f("u_draw_color", &draw_color);
 
         unsafe {
-            gl::BindVertexArray(self.render_vao);
+            gl::BindVertexArray(self.render_vao_operators);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
 
         }
@@ -210,16 +215,18 @@ impl Graph {
         }
     }
 
-    fn draw_operators(&mut self) {
+    /// Draws all ops in the network.
+    fn draw_all_ops(&mut self) {
         self.render_program_operators.bind();
         self.render_program_operators.uniform_matrix_4f("u_projection_matrix", &self.render_projection_matrix);
         for op in self.operators.iter() {
-            self.draw_operator(op);
+            self.draw_op(op);
         }
         self.render_program_operators.unbind();
     }
 
-    fn draw_connections(&mut self) {
+    /// Draws all connections between ops in the network.
+    fn draw_all_connections(&mut self) {
         if self.connections_need_update {
             unsafe {
                 println!("Current cache size: {}", self.connections_point_cache.len());
@@ -244,33 +251,78 @@ impl Graph {
         self.render_program_connections.unbind();
     }
 
+    /// Draws all of the operators and connections that make
+    /// up this graph.
+    pub fn draw(&mut self) {
+        self.draw_all_connections();
+        self.draw_all_ops();
+    }
+
+    /// Adds a new connection between two ops with UUIDs
+    /// `a` and `b`, respectively.
+    pub fn add_connection(&mut self, a: Uuid, b: Uuid) {
+        // First, find the two ops with matching UUIDs.
+        let mut op_a: Option<&mut Operator> = None;
+        let mut op_b: Option<&mut Operator> = None;
+        for op in self.operators.iter_mut() {
+            if op.id == a {
+                op_a = Some(op);
+            }
+            else if op.id == b {
+                op_b = Some(op);
+            }
+        }
+
+        if let (Some(src), Some(dst)) = (op_a, op_b) {
+            let src_pt = src.region_slot_output.centroid();
+            let dst_pt = dst.region_slot_input.centroid();
+
+            // Unselect both ops.
+            src.state = InteractionState::Unselected;
+            dst.state = InteractionState::Unselected;
+
+            // Push back the coordinates of the two connector slots.
+            self.connections_point_cache.push(src_pt.x);
+            self.connections_point_cache.push(src_pt.y);
+            self.connections_point_cache.push(dst_pt.x);
+            self.connections_point_cache.push(dst_pt.y);
+
+            println!("Connections set: {:?}", self.connections);
+            println!("-- Points: {:?} -> {:?}", src_pt, dst_pt);
+
+            self.connections_need_update = true;
+        } else {
+            println!("Attempting to connect two ops with non-existent UUIDs - something is wrong here")
+        }
+    }
+
     pub fn handle_interaction(&mut self, mouse_position: Vector2<f32>, mouse_down: bool) {
-        // The user can only select a single operator at a time
+        // The user can only select a single operator at a time.
         let mut found_selected = false;
         let mut connecting = false;
-        let mut src_id: usize = 0;
-        let mut dst_id: usize = 0;
+        let mut src_id = Uuid::nil();
+        let mut dst_id = Uuid::nil();
 
-        for (id, mut op) in self.operators.iter_mut().enumerate() {
+        for mut op in self.operators.iter_mut() {
 
             // If this operator is currently being connected to another,
-            // skip the rest of this loop
+            // skip the rest of this loop.
             if let InteractionState::ConnectSource = op.state {
                 if mouse_down {
                     found_selected = true;
                     connecting = true;
-                    src_id = id;
+                    src_id = op.id;
+
                     continue;
                 }
             }
 
             if op.region_operator.inside(&mouse_position) && !found_selected {
-
                 // Otherwise, check to see if the user's mouse is within this
-                // operator's output slot region
+                // operator's output slot region.
                 if op.region_slot_output.inside_with_padding(&mouse_position, 6.0) && mouse_down  {
                     op.state = InteractionState::ConnectSource;
-                    src_id = id;
+                    src_id = op.id;
                 }
                 else {
                     op.state = InteractionState::Selected;
@@ -284,19 +336,21 @@ impl Graph {
 
         // If the mouse is dragging from the output slot of one operator,
         // check if a potential connection has happened (i.e. the mouse
-        // is now over an input slot of a different operator)
+        // is now over an input slot of a different operator).
         let mut found_new_connection = false;
         if connecting {
-            for (id, op_destination) in self.operators.iter_mut().enumerate() {
-                // Make sure that the user is not trying to connect an operator to itself
-                if op_destination.region_slot_input.inside_with_padding(&mouse_position, 6.0) && src_id != id {
-                    op_destination.state = InteractionState::ConnectDestination;
-                    dst_id = id;
+            for op_destination in self.operators.iter_mut() {
+                // Make sure that the user is not trying to connect an operator to itself.
+                if op_destination.region_slot_input.inside_with_padding(&mouse_position, 6.0) &&
+                   src_id != op_destination.id {
 
-                    // Only add the connection if it doesn't already exist in the set
+                    op_destination.state = InteractionState::ConnectDestination;
+
+                    dst_id = op_destination.id;
+
+                    // Only add the connection if it doesn't already exist in the hash set.
                     if !self.connections.contains(&(src_id, dst_id)) {
                         self.connections.insert((src_id, dst_id));
-
                         found_new_connection = true;
                     }
                     else {
@@ -308,36 +362,16 @@ impl Graph {
         }
 
         if found_new_connection {
-            let src_pt = self.operators[src_id].region_slot_output.centroid();
-            let dst_pt = self.operators[dst_id].region_slot_input.centroid();
-            self.operators[src_id].state = InteractionState::Unselected;
-            self.operators[dst_id].state = InteractionState::Unselected;
-
-            self.connections_point_cache.push(src_pt.x);
-            self.connections_point_cache.push(src_pt.y);
-            self.connections_point_cache.push(dst_pt.x);
-            self.connections_point_cache.push(dst_pt.y);
-
-            println!("Connections set: {:?}", self.connections);
-            println!("-- Points: {:?} -> {:?}", src_pt, dst_pt);
-
-            self.connections_need_update = true;
+            self.add_connection(src_id, dst_id);
         }
-    }
-
-    /// Draws all of the operators and connections that make
-    /// up this graph.
-    pub fn draw(&mut self) {
-        self.draw_connections();
-        self.draw_operators();
     }
 }
 
 impl Drop for Graph {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteBuffers(1, &self.render_vbo);
-            gl::DeleteVertexArrays(1, &self.render_vao);
+            gl::DeleteBuffers(1, &self.render_vbo_operators);
+            gl::DeleteVertexArrays(1, &self.render_vao_operators);
         }
     }
 }

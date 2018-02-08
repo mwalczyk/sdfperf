@@ -3,7 +3,6 @@ use bounding_rect::BoundingRect;
 
 use cgmath::{ Vector2, Vector3 };
 use uuid::Uuid;
-use uuid::*;
 
 static REGION_SLOT_SIZE: f32 = 6.0;
 

@@ -17,12 +17,10 @@ use operator::Operator;
 use graph::Graph;
 use program::Program;
 
-use gl::types::*;
-use std::mem;
 use std::ptr;
-use std::str;
-use std::ffi::CString;
 use std::time::{Duration, SystemTime};
+
+use gl::types::*;
 use cgmath::Vector2;
 
 fn main() {
