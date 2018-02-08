@@ -1,12 +1,3 @@
-[root]
-name = "sdfperf_rs"
-version = "0.1.0"
-dependencies = [
- "cgmath 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "gl 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "glutin 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
 [[package]]
 name = "android_glue"
 version = "0.2.3"
@@ -364,6 +355,15 @@ dependencies = [
 name = "redox_syscall"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "sdfperf_rs"
+version = "0.1.0"
+dependencies = [
+ "cgmath 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gl 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "glutin 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "serde"

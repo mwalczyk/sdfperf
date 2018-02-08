@@ -13,15 +13,15 @@ pub struct UniformEntry {
     location: GLint
 }
 
-pub struct Program<'a> {
+pub struct Program {
     pub program_id: GLuint,
-    vert_shader_src: &'a str,
-    frag_shader_src: &'a str
+    vert_shader_src: String,
+    frag_shader_src: String
 }
 
-impl<'a> Program<'a> {
+impl Program {
 
-    fn compile_shader(src: &str, ty: GLenum) -> GLuint {
+    fn compile_shader(src: &String, ty: GLenum) -> GLuint {
         let shader;
 
         unsafe {
@@ -42,18 +42,9 @@ impl<'a> Program<'a> {
                 gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
                 let mut buf = Vec::with_capacity(len as usize);
                 buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
-                gl::GetShaderInfoLog(
-                    shader,
-                    len,
-                    ptr::null_mut(),
-                    buf.as_mut_ptr() as *mut GLchar,
-                );
-                panic!(
-                    "{}",
-                    str::from_utf8(&buf)
-                        .ok()
-                        .expect("ShaderInfoLog not valid utf8")
-                );
+
+                gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
+                panic!("{}", str::from_utf8(&buf).ok().expect("ShaderInfoLog not valid utf8"));
             }
         }
 
@@ -79,18 +70,9 @@ impl<'a> Program<'a> {
 
                 // Subtract 1 to skip the trailing null character
                 buf.set_len((len as usize) - 1);
-                gl::GetProgramInfoLog(
-                    program,
-                    len,
-                    ptr::null_mut(),
-                    buf.as_mut_ptr() as *mut GLchar,
-                );
-                panic!(
-                    "{}",
-                    str::from_utf8(&buf)
-                        .ok()
-                        .expect("ProgramInfoLog not valid utf8")
-                );
+
+                gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar, );
+                panic!("{}", str::from_utf8(&buf).ok().expect("ProgramInfoLog not valid utf8"));
 
                 gl::DeleteShader(fs);
                 gl::DeleteShader(vs);
@@ -104,10 +86,10 @@ impl<'a> Program<'a> {
 
     }
 
-    pub fn new(vert_shader_src: &'a str, frag_shader_src: &'a str) -> Program<'a> {
+    pub fn new(vert_shader_src: String, frag_shader_src: String) -> Program {
 
-        let vert_shader_id = Program::compile_shader(vert_shader_src, gl::VERTEX_SHADER);
-        let frag_shader_id = Program::compile_shader(frag_shader_src, gl::FRAGMENT_SHADER);
+        let vert_shader_id = Program::compile_shader(&vert_shader_src, gl::VERTEX_SHADER);
+        let frag_shader_id = Program::compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER);
         let program_id = Program::link_program(vert_shader_id, frag_shader_id);
 
         Program {
@@ -161,7 +143,7 @@ impl<'a> Program<'a> {
     }
 }
 
-impl<'a> Drop for Program<'a> {
+impl Drop for Program {
     fn drop(&mut self) {
         unsafe { gl::DeleteProgram(self.program_id); }
     }

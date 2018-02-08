@@ -16,12 +16,13 @@ use operator::InteractionState;
 
 static NETWORK_WIDTH: f32 = 800.0;
 static NETWORK_HEIGHT: f32 = 600.0;
+type Color = Vector4<f32>;
 
-pub struct Graph<'a> {
+pub struct Graph {
     operators: Vec<Operator>,
     connections: HashSet<(usize, usize)>,
-    render_program_operators: Program<'a>,
-    render_program_connections: Program<'a>,
+    render_program_operators: Program,
+    render_program_connections: Program,
     render_projection_matrix: Matrix4<f32>,
     render_vao: u32,
     render_vbo: u32,
@@ -32,9 +33,9 @@ pub struct Graph<'a> {
     network_zoom: f32
 }
 
-impl<'a> Graph<'a> {
+impl Graph {
 
-    pub fn new() -> Graph<'a> {
+    pub fn new() -> Graph {
         static VERTEX_DATA: [GLfloat; 12] = [
             // First triangle
             0.0, 0.0,   // UL
@@ -80,8 +81,8 @@ impl<'a> Graph<'a> {
             o_color = vec4(1.0, 0.0, 0.2, 1.0);
         }";
 
-        let render_program_operators = Program::new(VS_SRC_OP, FS_SRC_OP);
-        let render_program_connections = Program::new(VS_SRC_CN, FS_SRC_CN);
+        let render_program_operators = Program::new(VS_SRC_OP.to_string(), FS_SRC_OP.to_string());
+        let render_program_connections = Program::new(VS_SRC_CN.to_string(), FS_SRC_CN.to_string());
 
         // L, R, B, T, N, F
         let render_projection_matrix: Matrix4<f32> = cgmath::ortho(-(NETWORK_WIDTH * 0.5),
@@ -152,6 +153,7 @@ impl<'a> Graph<'a> {
     pub fn set_network_zoom(&mut self, network_zoom: f32) {
         self.network_zoom = network_zoom;
 
+        // Rebuild the projection matrix.
         self.render_projection_matrix = cgmath::ortho(-(NETWORK_WIDTH * 0.5) * self.network_zoom,
                                                       (NETWORK_WIDTH * 0.5) * self.network_zoom,
                                                       (NETWORK_HEIGHT * 0.5) * self.network_zoom,
@@ -169,9 +171,9 @@ impl<'a> Graph<'a> {
 
         // Pick a draw color based on the current interaction state of this operator
         let mut draw_color = match op.state {
-            InteractionState::Selected => Vector4::new(1.0, 1.0, 1.0, 1.0),
-            InteractionState::Unselected => Vector4::new(0.5, 0.5, 0.5, 1.0),
-            _ => Vector4::new(1.0, 1.0, 1.0, 1.0)
+            InteractionState::Selected => Color::new(1.0, 1.0, 1.0, 1.0),
+            InteractionState::Unselected => Color::new(0.5, 0.5, 0.5, 1.0),
+            _ => Color::new(1.0, 1.0, 1.0, 1.0)
         };
 
         self.render_program_operators.uniform_matrix_4f("u_model_matrix", &model_matrix);
@@ -186,7 +188,7 @@ impl<'a> Graph<'a> {
         match op.state {
             InteractionState::ConnectSource => {
                 model_matrix = op.region_slot_output.get_model_matrix();
-                draw_color = Vector4::new(0.0, 1.0, 0.1, 1.0);
+                draw_color = Color::new(0.0, 1.0, 0.1, 1.0);
 
                 self.render_program_operators.uniform_matrix_4f("u_model_matrix", &model_matrix);
                 self.render_program_operators.uniform_4f("u_draw_color", &draw_color);
@@ -195,7 +197,7 @@ impl<'a> Graph<'a> {
             },
             InteractionState::ConnectDestination => {
                 model_matrix = op.region_slot_input.get_model_matrix();
-                draw_color = Vector4::new(0.0, 1.0, 0.1, 1.0);
+                draw_color = Color::new(0.0, 1.0, 0.1, 1.0);
 
                 self.render_program_operators.uniform_matrix_4f("u_model_matrix", &model_matrix);
                 self.render_program_operators.uniform_4f("u_draw_color", &draw_color);
@@ -321,16 +323,15 @@ impl<'a> Graph<'a> {
         }
     }
 
+    /// Draws all of the operators and connections that make
+    /// up this graph.
     pub fn draw(&mut self) {
-        // Draw connections
         self.draw_connections();
-
-        // Draw operators
         self.draw_operators();
     }
 }
 
-impl<'a> Drop for Graph<'a> {
+impl Drop for Graph {
     fn drop(&mut self) {
         unsafe {
             gl::DeleteBuffers(1, &self.render_vbo);

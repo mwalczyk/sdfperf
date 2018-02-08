@@ -13,7 +13,7 @@ impl BoundingRect {
 
     pub fn inside(&self, point: &Vector2<f32>) -> bool {
         if point.x > self.upper_left.x && point.x < (self.upper_left.x + self.size.x) &&
-            point.y > self.upper_left.y && point.y < (self.upper_left.y + self.size.y) {
+           point.y > self.upper_left.y && point.y < (self.upper_left.y + self.size.y) {
             return true;
         }
         false
@@ -21,7 +21,7 @@ impl BoundingRect {
 
     pub fn inside_with_padding(&self, point: &Vector2<f32>, padding: f32) -> bool {
         if point.x > (self.upper_left.x - padding) && point.x < (self.upper_left.x + self.size.x + padding) &&
-            point.y > (self.upper_left.y - padding) && point.y < (self.upper_left.y + self.size.y + padding) {
+           point.y > (self.upper_left.y - padding) && point.y < (self.upper_left.y + self.size.y + padding) {
             return true;
         }
         false

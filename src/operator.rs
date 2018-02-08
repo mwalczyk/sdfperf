@@ -6,28 +6,28 @@ use cgmath::{ Vector2, Vector3 };
 static REGION_SLOT_SIZE: f32 = 6.0;
 
 struct OpInfo {
-    // A unique, numeric identifier - no two ops will have the same UUID
+    /// A unique, numeric identifier - no two ops will have the same UUID
     pub uuid: usize,
 
-    // The IDs of all ops that are connected to this op
+    /// The IDs of all ops that are connected to this op
     pub input_connection_ids: Vec<usize>,
 
-    // The IDs of all ops that this op connects to
+    /// The IDs of all ops that this op connects to
     pub output_connection_ids: Vec<usize>,
 
-    // The user-defined name of this operator
+    /// The user-defined name of this operator
     pub name: String,
 
-    // The bounding box of the op
+    /// The bounding box of the op
     pub region_operator: BoundingRect,
 
-    // The bounding box of the op's input slot
+    /// The bounding box of the op's input slot
     pub region_slot_input: BoundingRect,
 
-    // The bounding box of the op's output slot
+    /// The bounding box of the op's output slot
     pub region_slot_output: BoundingRect,
 
-    // The current interaction state of the op
+    /// The current interaction state of the op
     pub state: InteractionState
 }
 
@@ -130,9 +130,9 @@ impl Op for OpSphere {
 
     fn get_formatted_shader_code(&self) -> String {
         let mut code = self.get_op_type().get_unformatted_shader_code();
-        let mut formatted = format!(code, self.name, self.position, self.radius);
-
-        formatted
+        //let mut formatted = format!(code.as_str(), self.name, self.position, self.radius);
+        code
+        //formatted
     }
 }
 
