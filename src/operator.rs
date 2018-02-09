@@ -1,10 +1,7 @@
-use program::Program;
 use bounding_rect::BoundingRect;
 
-use cgmath::{ Vector2, Vector3 };
+use cgmath::Vector2;
 use uuid::Uuid;
-
-static REGION_SLOT_SIZE: f32 = 6.0;
 
 struct OpInfo {
     /// A unique, numeric identifier - no two ops will have the same UUID
@@ -20,13 +17,13 @@ struct OpInfo {
     pub name: String,
 
     /// The bounding box of the op
-    pub region_operator: BoundingRect,
+    pub aabb_op: BoundingRect,
 
     /// The bounding box of the op's input slot
-    pub region_slot_input: BoundingRect,
+    pub aabb_slot_input: BoundingRect,
 
     /// The bounding box of the op's output slot
-    pub region_slot_output: BoundingRect,
+    pub aabb_slot_output: BoundingRect,
 
     /// The current interaction state of the op
     pub state: InteractionState
@@ -49,11 +46,17 @@ pub enum OpType {
     /// Merges two distance fields using a `max` operation
     Intersection,
 
-    /// Merges two distance fields using a `smoothmin` operation
+    /// Merges two distance fields using a `smooth_min` operation
     SmoothMinimum,
 
     /// Final output node, required to render the graph
-    Render
+    Render,
+
+    // TODO (materials): AmbientOcclusion, Normals, Phong, Constant
+    // TODO (transforms): Scale, Translate, Rotate
+    // TODO (repeaters): ModRepeat, ModRepeatCircular
+    // TODO (displacers): PerlinNoise, FBMNoise
+    // TODO (data): Sin, Cos, Time, Noise, Random
 }
 
 impl OpType {
@@ -100,15 +103,15 @@ impl OpType {
 
     pub fn get_unformatted_shader_code(&self) -> String {
         // In all branches, `p` refers to the current position along the ray,
-        // i.e. the variable used in the `map` function
+        // i.e. the variable used in the `map` function.
         match *self {
-            OpType::Sphere => "float {} = sdfperf_sphere(p, {}, {});".to_string(),
-            OpType::Box => "float {} = sdfperf_box(p, {}, {});".to_string(),
-            OpType::Plane => "float {} = sdfperf_plane(p, {}, {});".to_string(),
-            OpType::Union => "float {} = sdfperf_op_union({}, {})".to_string(),
-            OpType::Intersection => "float {} = sdfperf_op_intersection({}, {})".to_string(),
-            OpType::SmoothMinimum => "float {} = sdfperf_op_smin({}, {}, {})".to_string(),
-            OpType::Render => "//render complete".to_string()
+            OpType::Sphere => "float sphere = sdf_sphere(p, vec3(0.0), 5.0);".to_string(),  //"float {} = sdf_sphere(p, {}, {});".to_string(),
+            OpType::Box => "float {} = sdf_box(p, {}, {});".to_string(),
+            OpType::Plane => "float {} = sdf_plane(p, {}, {});".to_string(),
+            OpType::Union => "float {} = sdf_op_union({}, {});".to_string(),
+            OpType::Intersection => "float {} = sdf_op_intersection({}, {});".to_string(),
+            OpType::SmoothMinimum => "float {} = sdf_op_smin({}, {}, {});".to_string(),
+            OpType::Render => "float render = sphere;".to_string()                          //"float {} = {};".to_string()
         }
     }
 }
@@ -120,64 +123,9 @@ pub enum InteractionState {
     ConnectDestination
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Op Implementations
-//
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//trait Op {
-//
-//    fn compute(&self) -> Option<f32> {
-//        None
-//    }
-//
-//    fn get_op_info(&self) -> &OpInfo;
-//
-//    fn get_op_type(&self) -> OpType;
-//
-//    fn get_formatted_shader_code(&self) -> String;
-//
-//    /// Returns the number of ops that are connected to this
-//    /// op in the current graph
-//    fn get_number_of_active_inputs(&self) -> usize {
-//        self.get_op_info().input_connection_ids.len()
-//    }
-//}
-//
-//pub struct OpSphere {
-//    info: OpInfo,
-//    position: Vector3<f32>,
-//    radius: f32,
-//}
-//
-//impl Op for OpSphere {
-//    fn get_op_info(&self) -> &OpInfo {
-//        &self.info
-//    }
-//
-//    fn get_op_type(&self) -> OpType {
-//        OpType::Sphere
-//    }
-//
-//    fn get_formatted_shader_code(&self) -> String {
-//        let mut code = self.get_op_type().get_unformatted_shader_code();
-//        //let mut formatted = format!(code.as_str(), self.name, self.position, self.radius);
-//        code
-//        //formatted
-//    }
-//}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
+trait InterfaceElement {
+    fn get_bounding_rect() -> BoundingRect;
+}
 
 pub struct Op {
     pub input_connection_ids: Vec<Uuid>,
@@ -193,16 +141,18 @@ pub struct Op {
 impl Op {
 
     pub fn new(op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
+        const SLOT_SIZE: Vector2<f32> = Vector2{ x: 6.0, y: 6.0 };
+
         // The bounding region of the op itself
         let region_operator = BoundingRect::new(upper_left, size);
 
         // The small bounding region of the input connection slot for this operator
-        let region_slot_input = BoundingRect::new(Vector2::new(upper_left.x - REGION_SLOT_SIZE * 0.5, upper_left.y + size.y * 0.5 - REGION_SLOT_SIZE * 0.5),
-                                                              Vector2::new(REGION_SLOT_SIZE, REGION_SLOT_SIZE));
+        let region_slot_input = BoundingRect::new(Vector2::new(upper_left.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
+                                                               SLOT_SIZE);
 
         // The small bounding region of the output connection slot for this operator
-        let region_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - REGION_SLOT_SIZE * 0.5, upper_left.y + size.y * 0.5 - REGION_SLOT_SIZE * 0.5),
-                                                               Vector2::new(REGION_SLOT_SIZE, REGION_SLOT_SIZE));
+        let region_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
+                                                                SLOT_SIZE);
         Op {
             input_connection_ids: Vec::new(),
             output_connection_ids: Vec::new(),

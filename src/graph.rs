@@ -12,6 +12,7 @@ use std::collections::HashSet;
 
 use program::Program;
 use operator::{Op, OpType, InteractionState};
+use bounding_rect::BoundingRect;
 
 type Color = Vector4<f32>;
 
@@ -31,37 +32,46 @@ pub struct Graph {
     network_resolution: Vector2<f32>,
 
     pub root: Option<Uuid>,
-    total_ops: usize
+    total_ops: usize,
+    pub generated_program: Option<Program>,
+    region_canvas: BoundingRect,
+    dirty: bool
 }
 
 impl Graph {
 
     /// Constructs a new, empty graph.
     pub fn new() -> Graph {
-        static VERTEX_DATA: [GLfloat; 12] = [
+        static VERTEX_DATA: [GLfloat; 24] = [
+            // Positions followed by texture coordinates.
             // First triangle
-            0.0, 0.0,   // UL
-            1.0, 0.0,   // UR
-            0.0, 1.0,   // LL
+            0.0, 0.0,   0.0, 1.0, // UL
+            1.0, 0.0,   1.0, 1.0, // UR
+            0.0, 1.0,   0.0, 0.0, // LL
 
             // Second triangle
-            1.0, 0.0,   // UR
-            1.0, 1.0,   // LR
-            0.0, 1.0    // LL
+            1.0, 0.0,   1.0, 1.0, // UR
+            1.0, 1.0,   1.0, 0.0, // LR
+            0.0, 1.0,   0.0, 0.0  // LL
         ];
 
         static VS_SRC_OP: &'static str = "
         #version 430
         layout(location = 0) in vec2 position;
+        layout(location = 1) in vec2 texcoord;
+        layout (location = 0) out vec2 vs_texcoord;
         uniform mat4 u_model_matrix;
         uniform mat4 u_projection_matrix;
         void main() {
+            vs_texcoord = texcoord;
+
             gl_Position = u_projection_matrix * u_model_matrix * vec4(position, 0.0, 1.0);
         }";
 
         static FS_SRC_OP: &'static str = "
         #version 430
         uniform vec4 u_draw_color;
+        layout (location = 0) in vec2 vs_texcoord;
         out vec4 o_color;
         void main() {
             o_color = u_draw_color;
@@ -86,7 +96,6 @@ impl Graph {
         let render_program_operators = Program::new(VS_SRC_OP.to_string(), FS_SRC_OP.to_string());
         let render_program_connections = Program::new(VS_SRC_CN.to_string(), FS_SRC_CN.to_string());
 
-
         let mut render_vao_operators = 0;
         let mut render_vbo_operators = 0;
         let mut render_vao_connections = 0;
@@ -103,13 +112,21 @@ impl Graph {
             );
 
             let mut pos_attr = gl::GetAttribLocation(render_program_operators.program_id, CString::new("position").unwrap().as_ptr());
+            let mut tex_attr = gl::GetAttribLocation(render_program_operators.program_id, CString::new("texcoord").unwrap().as_ptr());
 
             gl::CreateVertexArrays(1, &mut render_vao_operators);
-            gl::EnableVertexArrayAttrib(render_vao_operators, pos_attr as GLuint);
-            gl::VertexArrayAttribFormat(render_vao_operators, pos_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, 0);
-            gl::VertexArrayAttribBinding(render_vao_operators, pos_attr as GLuint, 0);
+            {
+                gl::EnableVertexArrayAttrib(render_vao_operators, pos_attr as GLuint);
+                gl::VertexArrayAttribFormat(render_vao_operators, pos_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, 0);
+                gl::VertexArrayAttribBinding(render_vao_operators, pos_attr as GLuint, 0);
+            }
+            {
+                gl::EnableVertexArrayAttrib(render_vao_operators, tex_attr as GLuint);
+                gl::VertexArrayAttribFormat(render_vao_operators, tex_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, (2 * mem::size_of::<GLfloat>()) as GLuint);
+                gl::VertexArrayAttribBinding(render_vao_operators, tex_attr as GLuint, 0);
+            }
 
-            gl::VertexArrayVertexBuffer(render_vao_operators, 0, render_vbo_operators, 0, (2 * mem::size_of::<GLfloat>()) as i32);
+            gl::VertexArrayVertexBuffer(render_vao_operators, 0, render_vbo_operators, 0, (4 * mem::size_of::<GLfloat>()) as i32);
 
             // Set up OpenGL objects for rendering connections.
             pos_attr = gl::GetAttribLocation(render_program_connections.program_id, CString::new("position").unwrap().as_ptr());
@@ -145,7 +162,11 @@ impl Graph {
             network_zoom: 1.0,
             network_resolution: Vector2::new(800.0, 600.0),
             root: None,
-            total_ops: 0
+            total_ops: 0,
+            generated_program: None,
+            region_canvas: BoundingRect::new(Vector2::new(200.0, 100.0),
+                                             Vector2::new(200.0, 200.0)),
+            dirty: false
         };
 
         // Initialize the projection matrix.
@@ -168,6 +189,19 @@ impl Graph {
                                                       -(self.network_resolution.y * 0.5) * self.network_zoom,
                                                       -1.0,
                                                       1.0);
+    }
+
+    pub fn resize(&mut self) {
+
+    }
+
+    pub fn dirty(&self) -> bool {
+        self.dirty
+    }
+
+    pub fn set_program(&mut self, program: Program) {
+        self.generated_program = Some(program);
+        self.dirty = false;
     }
 
     /// Adds a new op to the network at coordinates `screen_position`
@@ -273,11 +307,27 @@ impl Graph {
         self.render_program_connections.unbind();
     }
 
+    fn draw_generated(&self) {
+        if let Some(ref program) = self.generated_program {
+            program.bind();
+            let model_matrix = self.region_canvas.get_model_matrix();
+            program.uniform_matrix_4f("u_model_matrix", &model_matrix);
+            program.uniform_matrix_4f("u_projection_matrix", &self.render_projection_matrix);
+
+            unsafe {
+                gl::BindVertexArray(self.render_vao_operators);
+                gl::DrawArrays(gl::TRIANGLES, 0, 6);
+
+            }
+            program.unbind();
+        }
+    }
     /// Draws all of the operators and connections that make
     /// up this graph.
     pub fn draw(&mut self) {
         self.draw_all_connections();
         self.draw_all_ops();
+        self.draw_generated();
     }
 
     /// Returns an immutable reference to the op with the given
@@ -325,6 +375,7 @@ impl Graph {
                 // Here, we only proceed if the connection was successful.
                 if dst.op_type == OpType::Render {
                     self.root = Some(dst.id);
+                    self.dirty = true;
                     println!("Connected to render node: building graph");
                 }
 

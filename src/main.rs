@@ -2,7 +2,6 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
-
 extern crate gl;
 extern crate glutin;
 extern crate cgmath;
@@ -19,107 +18,100 @@ use graph::Graph;
 use program::Program;
 use shader_builder::ShaderBuilder;
 
-use std::ptr;
 use std::time::{Duration, SystemTime};
+use glutin::GlContext;
+use cgmath::{Vector2, Zero};
 
-use gl::types::*;
-use cgmath::Vector2;
+fn clear() {
+    unsafe {
+        gl::ClearColor(0.15, 0.15, 0.15, 1.0);
+        gl::Clear(gl::COLOR_BUFFER_BIT);
+    }
+}
 
 fn main() {
-    use glutin::GlContext;
-
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_dimensions(800, 600);
     let context = glutin::ContextBuilder::new();
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
-    // It is essential to make the context current before calling `gl::load_with`
     unsafe { gl_window.make_current() }.unwrap();
-
-    // Load the OpenGL function pointers
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
 
+    // Main objects
     let mut graph = Graph::new();
     let mut shader_builder = ShaderBuilder::new();
 
+    // Constants
+    const ZOOM_INCREMENT: f32 = 0.05;
+    const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
+
+    // Store system time
     let now = SystemTime::now();
+
+    // Store interaction state
     let mut mouse_down = false;
-    let mut mouse_position = Vector2::new(0.0, 0.0);
-    let mut clicked_mouse_position = Vector2::new(0.0, 0.0);
+    let mut mouse_position = Vector2::zero();
+    let mut last_clicked = Vector2::zero();
     let mut current_zoom = 1.0;
+    let mut current_size = Vector2::new(800.0, 600.0);
 
     loop {
         events_loop.poll_events(|event| {
             match event {
                 glutin::Event::WindowEvent { event, .. } => match event {
                     glutin::WindowEvent::Closed => (),
-                    glutin::WindowEvent::Resized(w, h) => gl_window.resize(w, h),
-                    glutin::WindowEvent::MouseMoved { position, .. } => {
-                        // Store mouse position
-                        mouse_position = Vector2::new(position.0 as f32, position.1 as f32);
-                        if let Some(window_size) = gl_window.get_inner_size_pixels() {
-                            // Zero center
-                            mouse_position.x = mouse_position.x - (window_size.0 / 2) as f32;
-                            mouse_position.y = mouse_position.y - (window_size.1 / 2) as f32;
 
-                            // Zoom
-                            mouse_position.x *= current_zoom;
-                            mouse_position.y *= current_zoom;
-                        }
+                    glutin::WindowEvent::Resized(w, h) => {
+                        current_size.x = w as f32;
+                        current_size.y = h as f32;
+                        gl_window.resize(w, h);
+                    },
+
+                    glutin::WindowEvent::MouseMoved { position, .. } => {
+                        // Store the current mouse position.
+                        mouse_position = Vector2::new(position.0 as f32, position.1 as f32);
+
+                        // Zero center and zoom.
+                        mouse_position -= current_size * 0.5;
+                        mouse_position *= current_zoom;
 
                         graph.handle_interaction(mouse_position, mouse_down);
                     },
+
                     glutin::WindowEvent::MouseWheel {delta, .. } => {
                         if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
                             if line_y == 1.0 {
-                                current_zoom -= 0.05;
+                                current_zoom -= ZOOM_INCREMENT;
                             }
                             else {
-                                current_zoom += 0.05;
+                                current_zoom += ZOOM_INCREMENT;
                             }
                             graph.set_network_zoom(current_zoom);
                         }
                     },
+
                     glutin::WindowEvent::MouseInput { state, .. } => {
-                        // Check if any operator was selected and store the click position
+
                         if let glutin::ElementState::Pressed = state {
-                            clicked_mouse_position = mouse_position;
+                            // Store the current mouse position.
+                            last_clicked = mouse_position;
                             mouse_down = true;
 
-                            graph.handle_interaction(clicked_mouse_position, mouse_down);
+                            graph.handle_interaction(last_clicked, mouse_down);
                         }
                         else {
                             mouse_down = false;
                         }
                     },
+
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         if let glutin::ElementState::Pressed = input.state {
                             if let Some(key) = input.virtual_keycode {
                                 match key {
-
-                                    // The `a` key adds a new operator to the graph.
-                                    glutin::VirtualKeyCode::A => {
-                                        const OPERATOR_SIZE: (f32, f32) = (100.0, 50.0);
-
-                                        graph.add_op(Vector2::new(mouse_position.x - OPERATOR_SIZE.0 / 2.0,
-                                                                  mouse_position.y - OPERATOR_SIZE.1 / 2.0),
-                                                     Vector2::new(OPERATOR_SIZE.0, OPERATOR_SIZE.1));
-
-                                        graph.handle_interaction(mouse_position, mouse_down);
-                                    },
-
-                                    // The `b` key builds shader code from the current graph.
-                                    glutin::VirtualKeyCode::B => {
-                                        shader_builder.traverse(&graph);
-                                    },
-
-                                    // All other keys are irrelevant.
+                                    glutin::VirtualKeyCode::A => graph.add_op(mouse_position - OPERATOR_SIZE * 0.5, OPERATOR_SIZE),
                                     _ => ()
                                 }
-                            }
-
-                            if input.scancode == 30 {
-
                             }
                         }
                     }
@@ -129,15 +121,21 @@ fn main() {
             }
         });
 
-        unsafe {
-            gl::ClearColor(0.15, 0.15, 0.15, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+        clear();
 
-            let elapsed = now.elapsed().unwrap();
-            let ms = elapsed.as_secs() * 1000 + elapsed.subsec_nanos() as u64 / 1_000_000;
+        // Calculate the amount of time that has elapsed (in ms) since
+        // application launch.
+        let elapsed = now.elapsed().unwrap();
+        let elapsed_ms = elapsed.as_secs() * 1000 + elapsed.subsec_nanos() as u64 / 1_000_000;
 
-            graph.draw();
+        // Check to see if the graph needs to be rebuilt.
+        if graph.dirty() {
+            let program = shader_builder.traverse(&graph);
+            graph.set_program(program);
         }
+
+        // Draw the graph (ops, connections, etc.).
+        graph.draw();
 
         gl_window.swap_buffers().unwrap();
     }

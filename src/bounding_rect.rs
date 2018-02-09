@@ -1,5 +1,12 @@
 use cgmath::{ Matrix, Matrix4, Vector2, Vector3 };
 
+pub enum Edge {
+    Left,
+    Right,
+    Top,
+    Bottom
+}
+
 #[derive(PartialEq)]
 pub struct BoundingRect {
     pub upper_left: Vector2<f32>,
@@ -9,6 +16,14 @@ pub struct BoundingRect {
 impl BoundingRect {
     pub fn new(upper_left: Vector2<f32>, size: Vector2<f32>) -> BoundingRect {
         BoundingRect { upper_left, size }
+    }
+
+    pub fn set_upper_left(&mut self, to: Vector2<f32>) {
+        self.upper_left = to;
+    }
+
+    pub fn set_size(&mut self, to: Vector2<f32>) {
+        self.size = to;
     }
 
     pub fn inside(&self, point: &Vector2<f32>) -> bool {
