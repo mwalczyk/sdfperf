@@ -11,11 +11,13 @@ mod program;
 mod operator;
 mod graph;
 mod bounding_rect;
+mod renderer;
 mod shader_builder;
 mod shader_string;
 
 use graph::Graph;
 use program::Program;
+use renderer::Renderer;
 use shader_builder::ShaderBuilder;
 
 use std::time::{Duration, SystemTime};
@@ -40,6 +42,7 @@ fn main() {
 
     // Main objects
     let mut graph = Graph::new();
+    let mut renderer = Renderer::new();
     let mut shader_builder = ShaderBuilder::new();
 
     // Constants
@@ -88,6 +91,7 @@ fn main() {
                                 current_zoom += ZOOM_INCREMENT;
                             }
                             graph.set_network_zoom(current_zoom);
+                            renderer.zoom(current_zoom);
                         }
                     },
 
