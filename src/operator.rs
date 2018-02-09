@@ -8,13 +8,13 @@ static REGION_SLOT_SIZE: f32 = 6.0;
 
 struct OpInfo {
     /// A unique, numeric identifier - no two ops will have the same UUID
-    pub uuid: usize,
+    pub id: Uuid,
 
     /// The IDs of all ops that are connected to this op
-    pub input_connection_ids: Vec<usize>,
+    pub input_connection_ids: Vec<Uuid>,
 
     /// The IDs of all ops that this op connects to
-    pub output_connection_ids: Vec<usize>,
+    pub output_connection_ids: Vec<Uuid>,
 
     /// The user-defined name of this operator
     pub name: String,
@@ -32,36 +32,49 @@ struct OpInfo {
     pub state: InteractionState
 }
 
-enum OpType {
-    // Generators
+#[derive(PartialEq, Eq)]
+pub enum OpType {
+    /// Generates a sphere primitive
     Sphere,
+
+    /// Generates a box primitive
     Box,
+
+    /// Generates a plane primitive
     Plane,
 
-    // Combinations
+    /// Merges two distance fields using a `min` operation
     Union,
+
+    /// Merges two distance fields using a `max` operation
     Intersection,
+
+    /// Merges two distance fields using a `smoothmin` operation
     SmoothMinimum,
 
-    // Final output node, required to render the graph
+    /// Final output node, required to render the graph
     Render
 }
 
 impl OpType {
+
+    /// Converts the enum variant into a human-readable string format.
     pub fn to_string(&self) -> String {
-        match self {
-            Sphere => "Sphere".to_string(),
-            Box => "Box".to_string(),
-            Plane => "Plane".to_string(),
-            Union => "Union".to_string(),
-            Intersection => "Intersection".to_string(),
-            SmoothMinimum => "SmoothMinimum".to_string(),
-            Render => "Render".to_string()
+        match *self {
+            OpType::Sphere => "Sphere".to_string(),
+            OpType::Box => "Box".to_string(),
+            OpType::Plane => "Plane".to_string(),
+            OpType::Union => "Union".to_string(),
+            OpType::Intersection => "Intersection".to_string(),
+            OpType::SmoothMinimum => "SmoothMinimum".to_string(),
+            OpType::Render => "Render".to_string()
         }
     }
 
     /// Returns the maximum number of ops that can be connected to this
-    /// op's input slot.
+    /// op's input slot. Note that there is no equivalent `get_output_capacity`
+    /// method, since an op's output slot can be connected to a potentially
+    /// unbounded number of other ops.
     pub fn get_input_capacity(&self) -> usize {
         match *self {
             OpType::Sphere | OpType::Box | OpType::Plane => 0,
@@ -70,9 +83,15 @@ impl OpType {
         }
     }
 
+    /// Returns `true` if this op's input slot can be connected to another
+    /// op's output slot and `false` otherwise.
+    pub fn has_inputs(&self) -> bool {
+        self.get_input_capacity() > 0
+    }
+
     /// Returns `true` if this op's output slot can be connected to another
     /// op's input slot and `false` otherwise.
-    pub fn has_output(&self) -> bool {
+    pub fn has_outputs(&self) -> bool {
         match *self {
             OpType::Render => false,
             _ => true
@@ -94,24 +113,6 @@ impl OpType {
     }
 }
 
-trait Op {
-    fn compute(&self) -> Option<f32> {
-        None
-    }
-
-    fn get_op_info(&self) -> &OpInfo;
-
-    fn get_op_type(&self) -> OpType;
-
-    fn get_formatted_shader_code(&self) -> String;
-
-    /// Returns the number of ops that are connected to this
-    /// op in the current graph
-    fn get_number_of_active_inputs(&self) -> usize {
-        self.get_op_info().input_connection_ids.len()
-    }
-}
-
 pub enum InteractionState {
     Unselected,
     Selected,
@@ -124,29 +125,47 @@ pub enum InteractionState {
 // Op Implementations
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct OpSphere {
-    info: OpInfo,
-    position: Vector3<f32>,
-    radius: f32,
-}
-
-impl Op for OpSphere {
-    fn get_op_info(&self) -> &OpInfo {
-        &self.info
-    }
-
-    fn get_op_type(&self) -> OpType {
-        OpType::Sphere
-    }
-
-    fn get_formatted_shader_code(&self) -> String {
-        let mut code = self.get_op_type().get_unformatted_shader_code();
-        //let mut formatted = format!(code.as_str(), self.name, self.position, self.radius);
-        code
-        //formatted
-    }
-}
+//trait Op {
+//
+//    fn compute(&self) -> Option<f32> {
+//        None
+//    }
+//
+//    fn get_op_info(&self) -> &OpInfo;
+//
+//    fn get_op_type(&self) -> OpType;
+//
+//    fn get_formatted_shader_code(&self) -> String;
+//
+//    /// Returns the number of ops that are connected to this
+//    /// op in the current graph
+//    fn get_number_of_active_inputs(&self) -> usize {
+//        self.get_op_info().input_connection_ids.len()
+//    }
+//}
+//
+//pub struct OpSphere {
+//    info: OpInfo,
+//    position: Vector3<f32>,
+//    radius: f32,
+//}
+//
+//impl Op for OpSphere {
+//    fn get_op_info(&self) -> &OpInfo {
+//        &self.info
+//    }
+//
+//    fn get_op_type(&self) -> OpType {
+//        OpType::Sphere
+//    }
+//
+//    fn get_formatted_shader_code(&self) -> String {
+//        let mut code = self.get_op_type().get_unformatted_shader_code();
+//        //let mut formatted = format!(code.as_str(), self.name, self.position, self.radius);
+//        code
+//        //formatted
+//    }
+//}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -160,20 +179,21 @@ impl Op for OpSphere {
 
 
 
-pub struct Operator {
-    pub input_connection_ids: Vec<usize>,
-    pub output_connection_ids: Vec<usize>,
+pub struct Op {
+    pub input_connection_ids: Vec<Uuid>,
+    pub output_connection_ids: Vec<Uuid>,
     pub region_operator: BoundingRect,
     pub region_slot_input: BoundingRect,
     pub region_slot_output: BoundingRect,
     pub state: InteractionState,
-    pub id: Uuid
+    pub id: Uuid,
+    pub op_type: OpType
 }
 
-impl Operator {
+impl Op {
 
-    pub fn new(upper_left: Vector2<f32>, size: Vector2<f32>) -> Operator {
-        // The bounding region of the operator itself
+    pub fn new(op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
+        // The bounding region of the op itself
         let region_operator = BoundingRect::new(upper_left, size);
 
         // The small bounding region of the input connection slot for this operator
@@ -183,25 +203,39 @@ impl Operator {
         // The small bounding region of the output connection slot for this operator
         let region_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - REGION_SLOT_SIZE * 0.5, upper_left.y + size.y * 0.5 - REGION_SLOT_SIZE * 0.5),
                                                                Vector2::new(REGION_SLOT_SIZE, REGION_SLOT_SIZE));
-        Operator {
-            input_connection_ids: vec![],
-            output_connection_ids: vec![],
+        Op {
+            input_connection_ids: Vec::new(),
+            output_connection_ids: Vec::new(),
             region_operator,
             region_slot_input,
             region_slot_output,
             state: InteractionState::Selected,
-            id: Uuid::new_v4()
+            id: Uuid::new_v4(),
+            op_type
         }
     }
 
-    pub fn connect_to(&mut self, other: &mut Operator) {
-        //self.output_connection_ids.push(other.id);
-        //other.input_connection_ids.push(self.id);
+    /// Returns the number of ops that are connected to this
+    /// op in the current graph
+    fn get_number_of_active_inputs(&self) -> usize {
+        self.input_connection_ids.len()
+    }
+
+    pub fn connect_to(&mut self, other: &mut Op) -> bool {
+        // Make sure that this op's output slot is active and the
+        // other op's input slot isn't already at capacity.
+        if self.op_type.has_outputs() && other.get_number_of_active_inputs() < other.op_type.get_input_capacity() {
+            self.output_connection_ids.push(other.id);
+            other.input_connection_ids.push(self.id);
+
+            return true;
+        }
+        false
     }
 
     pub fn set_screen_position(&mut self, position: &Vector2<f32>) {
         // ..
-        // Rebuild the two bounding rectangles
+        // Rebuild the two bounding rectangles - or translate them (create a bounding rectangle member function for this)
     }
 }
 

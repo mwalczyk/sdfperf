@@ -12,8 +12,9 @@ mod program;
 mod operator;
 mod graph;
 mod bounding_rect;
+mod shader_builder;
+mod shader_string;
 
-use operator::Operator;
 use graph::Graph;
 use program::Program;
 
@@ -94,7 +95,7 @@ fn main() {
                             if input.scancode == 30 {
                                 const OPERATOR_SIZE: (f32, f32) = (100.0, 50.0);
 
-                                graph.add_operator(Vector2::new(mouse_position.x - OPERATOR_SIZE.0 / 2.0,
+                                graph.add_op(Vector2::new(mouse_position.x - OPERATOR_SIZE.0 / 2.0,
                                                                             mouse_position.y - OPERATOR_SIZE.1 / 2.0),
                                                    Vector2::new(OPERATOR_SIZE.0, OPERATOR_SIZE.1));
 

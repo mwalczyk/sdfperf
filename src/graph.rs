@@ -11,14 +11,13 @@ use std::ffi::CString;
 use std::collections::HashSet;
 
 use program::Program;
-use operator::Operator;
-use operator::InteractionState;
+use operator::{Op, OpType, InteractionState};
 
 type Color = Vector4<f32>;
 
 pub struct Graph {
-    operators: Vec<Operator>,
-    connections: HashSet<(Uuid, Uuid)>,
+    pub ops: Vec<Op>,
+    pub connections: HashSet<(Uuid, Uuid)>,
     render_program_operators: Program,
     render_program_connections: Program,
     render_projection_matrix: Matrix4<f32>,
@@ -29,11 +28,15 @@ pub struct Graph {
     connections_point_cache: Vec<GLfloat>,
     connections_need_update: bool,
     network_zoom: f32,
-    network_resolution: Vector2<f32>
+    network_resolution: Vector2<f32>,
+
+    pub root: Option<Uuid>,
+    total_ops: usize
 }
 
 impl Graph {
 
+    /// Constructs a new, empty graph.
     pub fn new() -> Graph {
         static VERTEX_DATA: [GLfloat; 12] = [
             // First triangle
@@ -128,7 +131,7 @@ impl Graph {
         }
 
         let mut graph = Graph {
-            operators: Vec::new(),
+            ops: Vec::new(),
             connections: HashSet::new(),
             render_program_operators,
             render_program_connections,
@@ -140,7 +143,9 @@ impl Graph {
             connections_point_cache: Vec::new(),
             connections_need_update: false,
             network_zoom: 1.0,
-            network_resolution: Vector2::new(800.0, 600.0)
+            network_resolution: Vector2::new(800.0, 600.0),
+            root: None,
+            total_ops: 0
         };
 
         // Initialize the projection matrix.
@@ -167,12 +172,29 @@ impl Graph {
 
     /// Adds a new op to the network at coordinates `screen_position`
     /// and dimensions `screen_size`.
-    pub fn add_operator(&mut self, screen_position: Vector2<f32>, screen_size: Vector2<f32>) {
-        self.operators.push(Operator::new(screen_position, screen_size));
+    pub fn add_op(&mut self, screen_position: Vector2<f32>, screen_size: Vector2<f32>) {
+
+        let op_type = match self.total_ops {
+            0 => {
+                println!("here");
+                OpType::Sphere
+            },
+            1 => {
+                println!("here render");
+                OpType::Render
+            },
+            _ => OpType::Render
+        };
+
+        self.total_ops += 1;
+        println!("Total ops in network: {}", self.total_ops);
+        println!("Adding op with type: {}", op_type.to_string());
+
+        self.ops.push(Op::new(op_type, screen_position, screen_size));
     }
 
     /// Draws a single op in the network.
-    fn draw_op(&self, op: &Operator) {
+    fn draw_op(&self, op: &Op) {
         let mut model_matrix = op.region_operator.get_model_matrix();
 
         // Pick a draw color based on the current interaction state of this operator
@@ -219,7 +241,7 @@ impl Graph {
     fn draw_all_ops(&mut self) {
         self.render_program_operators.bind();
         self.render_program_operators.uniform_matrix_4f("u_projection_matrix", &self.render_projection_matrix);
-        for op in self.operators.iter() {
+        for op in self.ops.iter() {
             self.draw_op(op);
         }
         self.render_program_operators.unbind();
@@ -258,13 +280,35 @@ impl Graph {
         self.draw_all_ops();
     }
 
+    /// Returns an immutable reference to the op with the given
+    /// UUID, if it exists in the graph.
+    pub fn get_op(&self, id: Uuid) -> Option<&Op> {
+        for op in self.ops.iter() {
+            if op.id == id {
+                return Some(op);
+            }
+        }
+        None
+    }
+
+    /// Returns an mutable reference to the op with the given
+    /// UUID, if it exists in the graph.
+    pub fn get_op_mut(&mut self, id: Uuid) -> Option<&mut Op> {
+        for op in self.ops.iter_mut() {
+            if op.id == id {
+                return Some(op);
+            }
+        }
+        None
+    }
+
     /// Adds a new connection between two ops with UUIDs
     /// `a` and `b`, respectively.
     pub fn add_connection(&mut self, a: Uuid, b: Uuid) {
         // First, find the two ops with matching UUIDs.
-        let mut op_a: Option<&mut Operator> = None;
-        let mut op_b: Option<&mut Operator> = None;
-        for op in self.operators.iter_mut() {
+        let mut op_a: Option<&mut Op> = None;
+        let mut op_b: Option<&mut Op> = None;
+        for op in self.ops.iter_mut() {
             if op.id == a {
                 op_a = Some(op);
             }
@@ -277,20 +321,30 @@ impl Graph {
             let src_pt = src.region_slot_output.centroid();
             let dst_pt = dst.region_slot_input.centroid();
 
-            // Unselect both ops.
-            src.state = InteractionState::Unselected;
-            dst.state = InteractionState::Unselected;
+            if src.connect_to(dst) {
+                // Here, we only proceed if the connection was successful.
+                if dst.op_type == OpType::Render {
+                    self.root = Some(dst.id);
+                    println!("Connected to render node: building graph");
+                }
 
-            // Push back the coordinates of the two connector slots.
-            self.connections_point_cache.push(src_pt.x);
-            self.connections_point_cache.push(src_pt.y);
-            self.connections_point_cache.push(dst_pt.x);
-            self.connections_point_cache.push(dst_pt.y);
+                // Deselect both ops.
+                src.state = InteractionState::Unselected;
+                dst.state = InteractionState::Unselected;
 
-            println!("Connections set: {:?}", self.connections);
-            println!("-- Points: {:?} -> {:?}", src_pt, dst_pt);
+                // Push back the coordinates of the two connector slots.
+                self.connections_point_cache.push(src_pt.x);
+                self.connections_point_cache.push(src_pt.y);
+                self.connections_point_cache.push(dst_pt.x);
+                self.connections_point_cache.push(dst_pt.y);
 
-            self.connections_need_update = true;
+                println!("Connections set: {:?}", self.connections);
+                println!("-- Points: {:?} -> {:?}", src_pt, dst_pt);
+
+                self.connections_need_update = true;
+            } else {
+                println!("Connection unsuccessful");
+            }
         } else {
             println!("Attempting to connect two ops with non-existent UUIDs - something is wrong here")
         }
@@ -303,7 +357,7 @@ impl Graph {
         let mut src_id = Uuid::nil();
         let mut dst_id = Uuid::nil();
 
-        for mut op in self.operators.iter_mut() {
+        for mut op in self.ops.iter_mut() {
 
             // If this operator is currently being connected to another,
             // skip the rest of this loop.
@@ -339,7 +393,7 @@ impl Graph {
         // is now over an input slot of a different operator).
         let mut found_new_connection = false;
         if connecting {
-            for op_destination in self.operators.iter_mut() {
+            for op_destination in self.ops.iter_mut() {
                 // Make sure that the user is not trying to connect an operator to itself.
                 if op_destination.region_slot_input.inside_with_padding(&mouse_position, 6.0) &&
                    src_id != op_destination.id {
