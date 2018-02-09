@@ -17,6 +17,7 @@ mod shader_string;
 
 use graph::Graph;
 use program::Program;
+use shader_builder::ShaderBuilder;
 
 use std::ptr;
 use std::time::{Duration, SystemTime};
@@ -39,6 +40,8 @@ fn main() {
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
 
     let mut graph = Graph::new();
+    let mut shader_builder = ShaderBuilder::new();
+
     let now = SystemTime::now();
     let mut mouse_down = false;
     let mut mouse_position = Vector2::new(0.0, 0.0);
@@ -90,16 +93,33 @@ fn main() {
                         }
                     },
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
-                        // `a` adds a new operator to the graph
                         if let glutin::ElementState::Pressed = input.state {
+                            if let Some(key) = input.virtual_keycode {
+                                match key {
+
+                                    // The `a` key adds a new operator to the graph.
+                                    glutin::VirtualKeyCode::A => {
+                                        const OPERATOR_SIZE: (f32, f32) = (100.0, 50.0);
+
+                                        graph.add_op(Vector2::new(mouse_position.x - OPERATOR_SIZE.0 / 2.0,
+                                                                  mouse_position.y - OPERATOR_SIZE.1 / 2.0),
+                                                     Vector2::new(OPERATOR_SIZE.0, OPERATOR_SIZE.1));
+
+                                        graph.handle_interaction(mouse_position, mouse_down);
+                                    },
+
+                                    // The `b` key builds shader code from the current graph.
+                                    glutin::VirtualKeyCode::B => {
+                                        shader_builder.traverse(&graph);
+                                    },
+
+                                    // All other keys are irrelevant.
+                                    _ => ()
+                                }
+                            }
+
                             if input.scancode == 30 {
-                                const OPERATOR_SIZE: (f32, f32) = (100.0, 50.0);
 
-                                graph.add_op(Vector2::new(mouse_position.x - OPERATOR_SIZE.0 / 2.0,
-                                                                            mouse_position.y - OPERATOR_SIZE.1 / 2.0),
-                                                   Vector2::new(OPERATOR_SIZE.0, OPERATOR_SIZE.1));
-
-                                graph.handle_interaction(mouse_position, mouse_down);
                             }
                         }
                     }
@@ -122,3 +142,4 @@ fn main() {
         gl_window.swap_buffers().unwrap();
     }
 }
+

@@ -175,14 +175,8 @@ impl Graph {
     pub fn add_op(&mut self, screen_position: Vector2<f32>, screen_size: Vector2<f32>) {
 
         let op_type = match self.total_ops {
-            0 => {
-                println!("here");
-                OpType::Sphere
-            },
-            1 => {
-                println!("here render");
-                OpType::Render
-            },
+            0 => OpType::Sphere,
+            1 => OpType::Render,
             _ => OpType::Render
         };
 
@@ -198,9 +192,15 @@ impl Graph {
         let mut model_matrix = op.region_operator.get_model_matrix();
 
         // Pick a draw color based on the current interaction state of this operator
+        // and the op type.
         let mut draw_color = match op.state {
             InteractionState::Selected => Color::new(1.0, 1.0, 1.0, 1.0),
-            InteractionState::Unselected => Color::new(0.5, 0.5, 0.5, 1.0),
+            InteractionState::Unselected => {
+                match op.op_type {
+                    OpType::Render => Color::new(1.0, 0.64, 0.44, 1.0),
+                    _ => Color::new(0.5, 0.5, 0.5, 1.0)
+                }
+            },
             _ => Color::new(1.0, 1.0, 1.0, 1.0)
         };
 
@@ -213,7 +213,7 @@ impl Graph {
 
         }
 
-        // Draw the connection slot, if necessary
+        // Draw the connection slot(s), if necessary.
         match op.state {
             InteractionState::ConnectSource => {
                 model_matrix = op.region_slot_output.get_model_matrix();
