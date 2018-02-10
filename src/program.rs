@@ -87,7 +87,6 @@ impl Program {
     }
 
     pub fn new(vert_shader_src: String, frag_shader_src: String) -> Program {
-
         let vert_shader_id = Program::compile_shader(&vert_shader_src, gl::VERTEX_SHADER);
         let frag_shader_id = Program::compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER);
         let program_id = Program::link_program(vert_shader_id, frag_shader_id);
@@ -105,6 +104,20 @@ impl Program {
 
     pub fn unbind(&self) {
         unsafe { gl::UseProgram(0); }
+    }
+
+    pub fn uniform_1i(&self, name: &str, value: i32) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform1i(self.program_id, location, value as gl::types::GLint);
+        }
+    }
+
+    pub fn uniform_1ui(&self, name: &str, value: u32) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform1ui(self.program_id, location, value as gl::types::GLuint);
+        }
     }
 
     pub fn uniform_1f(&self, name: &str, value: f32) {

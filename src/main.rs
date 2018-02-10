@@ -20,13 +20,12 @@ use program::Program;
 use renderer::Renderer;
 use shader_builder::ShaderBuilder;
 
-use std::time::{Duration, SystemTime};
 use glutin::GlContext;
 use cgmath::{Vector2, Zero};
 
 fn clear() {
     unsafe {
-        gl::ClearColor(0.15, 0.15, 0.15, 1.0);
+        gl::ClearColor(0.41, 0.44, 0.61, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT);
     }
 }
@@ -34,7 +33,7 @@ fn clear() {
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_dimensions(800, 600);
-    let context = glutin::ContextBuilder::new();
+    let context = glutin::ContextBuilder::new().with_multisampling(4);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
     unsafe { gl_window.make_current() }.unwrap();
@@ -48,9 +47,6 @@ fn main() {
     // Constants
     const ZOOM_INCREMENT: f32 = 0.05;
     const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
-
-    // Store system time
-    let now = SystemTime::now();
 
     // Store interaction state
     let mut mouse_down = false;
@@ -90,7 +86,6 @@ fn main() {
                             else {
                                 current_zoom += ZOOM_INCREMENT;
                             }
-                            graph.set_network_zoom(current_zoom);
                             renderer.zoom(current_zoom);
                         }
                     },
@@ -127,19 +122,18 @@ fn main() {
 
         clear();
 
-        // Calculate the amount of time that has elapsed (in ms) since
-        // application launch.
-        let elapsed = now.elapsed().unwrap();
-        let elapsed_ms = elapsed.as_secs() * 1000 + elapsed.subsec_nanos() as u64 / 1_000_000;
-
         // Check to see if the graph needs to be rebuilt.
         if graph.dirty() {
             let program = shader_builder.traverse(&graph);
-            graph.set_program(program);
+            renderer.set_preview_program(program);
+
+            graph.clean();
         }
 
         // Draw the graph (ops, connections, etc.).
-        graph.draw();
+        graph.draw(&renderer);
+
+        renderer.draw_preview();
 
         gl_window.swap_buffers().unwrap();
     }

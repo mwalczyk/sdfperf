@@ -46,8 +46,6 @@ impl ShaderBuilder {
     }
 
     pub fn build_sources(&mut self, graph: &Graph, post_order_ids: Vec<Uuid>) -> (String, String) {
-
-
         let header = "
         #version 430
         layout (location = 0) in vec2 vs_texcoord;
