@@ -54,7 +54,8 @@ impl Graph {
     pub fn add_op(&mut self, position: Vector2<f32>, size: Vector2<f32>) {
         let op_type = match self.total_ops {
             0 => OpType::Sphere,
-            1 => OpType::Render,
+            1 => OpType::Box,
+            2 => OpType::SmoothMinimum,
             _ => OpType::Render
         };
 
@@ -63,6 +64,7 @@ impl Graph {
         println!("Adding op with type: {}", op_type.to_string());
 
         self.ops.push(Op::new(op_type, position, size));
+        println!("Op name: {}", self.ops.last().unwrap().name)
     }
 
     /// Draws a single op in the network.
@@ -71,7 +73,7 @@ impl Graph {
         // and the op type.
         let mut draw_color = match op.op_type {
             OpType::Sphere | OpType::Box | OpType::Plane => Color::new(0.77, 0.80, 1.0, 1.0),
-            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => Color::new(0.77, 0.80, 1.0, 1.0),
+            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => Color::new(0.57, 0.60, 0.8, 1.0),
             OpType::Render => Color::new(0.99, 0.64, 0.45, 1.0)
         };
 

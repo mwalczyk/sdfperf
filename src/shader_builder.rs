@@ -1,5 +1,5 @@
 use graph::Graph;
-use operator::Op;
+use operator::{Op, OpType};
 use program::Program;
 use uuid::Uuid;
 
@@ -27,6 +27,13 @@ impl ShaderBuilder {
 
             // Recurse with each of the root op's inputs.
             for input_id in &render_op.input_connection_ids {
+
+
+                let input_op = graph.get_op(*input_id).unwrap();
+                for id in &input_op.input_connection_ids {
+                    post_order_ids.push(*id);
+                }
+
                 post_order_ids.push(*input_id);
             }
 
@@ -108,8 +115,6 @@ impl ShaderBuilder {
         ".to_string();
 
         let footer = "
-            const float id = 0.0;
-            return vec2(id, render);
         }
 
         vec3 calculate_normal(in vec3 p)
@@ -172,7 +177,7 @@ impl ShaderBuilder {
                     vec3 n = calculate_normal(hit);
                     vec3 l = normalize(vec3(1.0, 5.0, 0.0));
                     float d = max(0.0, dot(n, l));
-                    color = vec3(d);
+                    color = n * 0.5 + 0.5; //vec3(d);
                     break;
                 case 1:
                     // Placeholder
@@ -193,8 +198,36 @@ impl ShaderBuilder {
             if let Some(op) = graph.get_op(uuid) {
                 // Append this op's line of shader code with a leading
                 // tab and trailing newline.
+                let mut formatted = match op.op_type {
+                    OpType::Sphere | OpType::Box => op.op_type.get_formatted(vec![op.name.clone()]),
+
+                    OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
+                        let input_id_a = op.input_connection_ids[0];
+                        let input_id_b = op.input_connection_ids[1];
+
+                        op.op_type.get_formatted(vec![
+                            op.name.clone(),                                    // This op's name
+                            graph.get_op(input_id_a).unwrap().name.clone(),  // The name of this op's 1st input
+                            graph.get_op(input_id_b).unwrap().name.clone()   // The name of this op's 2nd input
+                        ])
+                    }
+
+                    OpType::Render => {
+                        let input_id = op.input_connection_ids[0];
+                        let input_name = graph.get_op(input_id).unwrap().name.clone();
+
+                        let mut code = op.op_type.get_formatted(vec![op.name.clone(), input_name]);
+                        code.push('\n');
+                        code.push_str(&format!("return vec2(0.0, {});", &op.name[..])[..]);
+                        code
+                    },
+
+                    _ => "// empty".to_string()
+                };
+                println!("{}", formatted);
+
                 self.shader_code.push('\t');
-                self.shader_code.push_str(&op.op_type.get_unformatted_shader_code()[..]);
+                self.shader_code.push_str(&formatted[..]);
                 self.shader_code.push('\n');
             }
         }

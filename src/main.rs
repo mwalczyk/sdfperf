@@ -16,6 +16,7 @@ mod shader_builder;
 mod shader_string;
 
 use graph::Graph;
+use operator::{Op, OpType};
 use program::Program;
 use renderer::Renderer;
 use shader_builder::ShaderBuilder;

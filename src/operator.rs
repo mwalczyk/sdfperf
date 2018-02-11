@@ -1,7 +1,11 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use bounding_rect::BoundingRect;
 
 use cgmath::Vector2;
 use uuid::Uuid;
+
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 struct OpInfo {
     /// A unique, numeric identifier - no two ops will have the same UUID
@@ -64,13 +68,13 @@ impl OpType {
     /// Converts the enum variant into a human-readable string format.
     pub fn to_string(&self) -> String {
         match *self {
-            OpType::Sphere => "Sphere".to_string(),
-            OpType::Box => "Box".to_string(),
-            OpType::Plane => "Plane".to_string(),
-            OpType::Union => "Union".to_string(),
-            OpType::Intersection => "Intersection".to_string(),
-            OpType::SmoothMinimum => "SmoothMinimum".to_string(),
-            OpType::Render => "Render".to_string()
+            OpType::Sphere => "sphere".to_string(),
+            OpType::Box => "box".to_string(),
+            OpType::Plane => "plane".to_string(),
+            OpType::Union => "union".to_string(),
+            OpType::Intersection => "intersection".to_string(),
+            OpType::SmoothMinimum => "smooth_minimum".to_string(),
+            OpType::Render => "render".to_string()
         }
     }
 
@@ -101,18 +105,43 @@ impl OpType {
         }
     }
 
-    pub fn get_unformatted_shader_code(&self) -> String {
+    pub fn get_unformatted(&self) -> String {
         // In all branches, `p` refers to the current position along the ray,
         // i.e. the variable used in the `map` function.
         match *self {
-            OpType::Sphere => "float sphere = sdf_sphere(p, vec3(0.0), 5.0);".to_string(),  //"float {} = sdf_sphere(p, {}, {});".to_string(),
-            OpType::Box => "float {} = sdf_box(p, {}, {});".to_string(),
+            OpType::Sphere => "float {} = sdf_sphere(p, vec3(0.0), 5.0);".to_string(),
+            OpType::Box => "float {} = sdf_box(p, vec3(3.0));".to_string(),
             OpType::Plane => "float {} = sdf_plane(p, {}, {});".to_string(),
-            OpType::Union => "float {} = sdf_op_union({}, {});".to_string(),
-            OpType::Intersection => "float {} = sdf_op_intersection({}, {});".to_string(),
-            OpType::SmoothMinimum => "float {} = sdf_op_smin({}, {}, {});".to_string(),
-            OpType::Render => "float render = sphere;".to_string()                          //"float {} = {};".to_string()
+            OpType::Union => "float {} = op_union({}, {});".to_string(),
+            OpType::Intersection => "float {} = op_intersect({}, {});".to_string(),
+            OpType::SmoothMinimum => "float {} = op_smooth_min({}, {}, 1.0);".to_string(),
+            OpType::Render => "float {} = {};".to_string()
         }
+}
+
+    /// Returns the number of `{}` entries in the unformatted shader code
+    /// corresponding to this op type.
+    pub fn get_number_of_entries(&self) -> usize {
+        match *self {
+            OpType::Sphere | OpType::Box => 1,
+            OpType::Render => 2,
+            _ => 3
+        }
+    }
+
+    pub fn get_formatted(&self, entries: Vec<String>) -> String {
+        if entries.len() != self.get_number_of_entries() {
+            panic!("Too few or too many entries passed to formatting function");
+        }
+
+        let mut formatted = self.get_unformatted();
+        for i in 0..self.get_number_of_entries() {
+            formatted = formatted.replacen("{}", &entries[i][..], 1);
+        }
+
+        formatted
+
+        //let indices: Vec<_> = self.get_unformatted_shader_code().match_indices("{}").collect();
     }
 }
 
@@ -135,6 +164,7 @@ pub struct Op {
     pub region_slot_output: BoundingRect,
     pub state: InteractionState,
     pub id: Uuid,
+    pub name: String,
     pub op_type: OpType
 }
 
@@ -142,6 +172,7 @@ impl Op {
 
     pub fn new(op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
         const SLOT_SIZE: Vector2<f32> = Vector2{ x: 6.0, y: 6.0 };
+        let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
         // The bounding region of the op itself
         let region_operator = BoundingRect::new(upper_left, size);
@@ -161,6 +192,7 @@ impl Op {
             region_slot_output,
             state: InteractionState::Selected,
             id: Uuid::new_v4(),
+            name: format!("{}_{}", op_type.to_string(), count),
             op_type
         }
     }
