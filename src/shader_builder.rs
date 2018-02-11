@@ -15,45 +15,55 @@ impl ShaderBuilder {
         }
     }
 
-    pub fn traverse(&mut self, graph: &Graph) -> Program {
-        let mut post_order_ids = Vec::new();
+    pub fn traverse_postorder(&mut self, graph: &Graph) -> Program {
+        let mut uuids = Vec::new();
 
         // Is there an active render node in this graph?
-        if let Some(root) = graph.root {
+        if let Some(root_uuid) = graph.root {
+            let root = graph.get_op(root_uuid).unwrap();
 
-            // Since `root` is actually an `Option<Uuid>`, we get an actual
-            // reference to the render op here.
-            let render_op = graph.get_op(root).unwrap();
-
-            // Recurse with each of the root op's inputs.
-            for input_id in &render_op.input_connection_ids {
-
-
-                let input_op = graph.get_op(*input_id).unwrap();
-                for id in &input_op.input_connection_ids {
-                    post_order_ids.push(*id);
-                }
-
-                post_order_ids.push(*input_id);
-            }
-
-            post_order_ids.push(root);
+            // Traverse the graph, starting at the root op.
+            self.recurse(graph, root, &mut uuids);
         }
 
-        println!("Post-order traversal resulted in list:");
-        println!("{:?}", post_order_ids);
-
-        let (vs_src, fs_src) = self.build_sources(graph, post_order_ids);
+        let (vs_src, fs_src) = self.build_sources(graph, uuids);
 
         Program::new(vs_src, fs_src)
     }
 
-    fn recurse(&self, op: &Op) {
-        // TODO: http://www.deepideas.net/deep-learning-from-scratch-i-computational-graphs/
+    /// Examine a `root` op's inputs and recurse backwards until
+    /// reaching a leaf node (i.e. an op with no other inputs).
+    fn recurse(&self, graph: &Graph, root: &Op, uuids: &mut Vec<Uuid>) {
+        if root.op_type.has_inputs() {
+            for input_id in &root.input_uuids {
+                self.recurse(graph, graph.get_op(*input_id).unwrap(), uuids);
+            }
+        }
+
+        // Finally, push back the root op's UUID.
+        uuids.push(root.id);
     }
 
-    pub fn build_sources(&mut self, graph: &Graph, post_order_ids: Vec<Uuid>) -> (String, String) {
-        let header = "
+    fn build_sources(&mut self, graph: &Graph, uuids: Vec<Uuid>) -> (String, String) {
+        static TRANSFORMS: &str = "
+        struct transform
+        {
+            vec3 r; // rotation
+            vec3 s; // scale
+            vec3 t; // translation
+        }
+
+        uint sphere_id = 0;
+        vec3 r = ubo[sphere_id].r;
+        vec3 s = ubo[sphere_id].s;
+        vec3 t = ubo[sphere_id].t;
+
+        // do some stuff to transform `p`
+        float node = ...;
+        float sphere = sdf_sphere(node, vec3(0.0), 1.0);
+        ";
+
+        static HEADER: &str = "
         #version 430
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
@@ -112,9 +122,9 @@ impl ShaderBuilder {
         vec2 map(in vec3 p)
         {
             // start of generated code
-        ".to_string();
+        ";
 
-        let footer = "
+        static FOOTER: &str = "
         }
 
         vec3 calculate_normal(in vec3 p)
@@ -192,33 +202,41 @@ impl ShaderBuilder {
             }
 
             o_color = vec4(color, 1.0);
-        }".to_string();
+        }";
 
-        for uuid in post_order_ids {
+        for uuid in uuids {
             if let Some(op) = graph.get_op(uuid) {
                 // Append this op's line of shader code with a leading
                 // tab and trailing newline.
                 let mut formatted = match op.op_type {
+
                     OpType::Sphere | OpType::Box => op.op_type.get_formatted(vec![op.name.clone()]),
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
-                        let input_id_a = op.input_connection_ids[0];
-                        let input_id_b = op.input_connection_ids[1];
+                        let uuid_a = op.input_uuids[0];
+                        let uuid_b = op.input_uuids[1];
 
                         op.op_type.get_formatted(vec![
-                            op.name.clone(),                                    // This op's name
-                            graph.get_op(input_id_a).unwrap().name.clone(),  // The name of this op's 1st input
-                            graph.get_op(input_id_b).unwrap().name.clone()   // The name of this op's 2nd input
+                            op.name.clone(),                                 // This op's name
+                            graph.get_op(uuid_a).unwrap().name.clone(), // The name of this op's 1st input
+                            graph.get_op(uuid_b).unwrap().name.clone()  // The name of this op's 2nd input
                         ])
                     }
 
                     OpType::Render => {
-                        let input_id = op.input_connection_ids[0];
-                        let input_name = graph.get_op(input_id).unwrap().name.clone();
+                        let uuid = op.input_uuids[0];
+                        let name = graph.get_op(uuid).unwrap().name.clone();
 
-                        let mut code = op.op_type.get_formatted(vec![op.name.clone(), input_name]);
+                        let mut code = op.op_type.get_formatted(vec![
+                            op.name.clone(),    // This op's name
+                            name                // The input op's name
+                        ]);
+
+                        // Add the final `return` in the `map(..)` function.
                         code.push('\n');
+                        code.push('\t');
                         code.push_str(&format!("return vec2(0.0, {});", &op.name[..])[..]);
+
                         code
                     },
 
@@ -232,9 +250,10 @@ impl ShaderBuilder {
             }
         }
 
-        let mut fs_src = header;
+        let mut fs_src = String::new();
+        fs_src.push_str(HEADER);
         fs_src.push_str(&self.shader_code[..]);
-        fs_src.push_str(&footer[..]);
+        fs_src.push_str(FOOTER);
         println!("Final shader code:");
         println!("{}", fs_src);
 

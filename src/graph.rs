@@ -1,10 +1,10 @@
 use cgmath::{self, Vector2, Vector4, Zero };
 use uuid::Uuid;
 
-use std::collections::HashSet;
-
-use operator::{Op, OpType, InteractionState};
+use operator::{Op, OpType, MouseInfo, InteractionState};
 use renderer::Renderer;
+
+use std::collections::HashSet;
 
 type Color = Vector4<f32>;
 
@@ -13,11 +13,11 @@ pub struct Graph {
 
     pub connections: HashSet<(Uuid, Uuid)>,
 
-    pub connections_point_cache: Vec<f32>,
+    pub selection: Option<Uuid>,
 
     pub root: Option<Uuid>,
 
-    pub total_ops: usize,
+    total_ops: usize,
 
     dirty: bool
 }
@@ -26,10 +26,10 @@ impl Graph {
 
     /// Constructs a new, empty graph.
     pub fn new() -> Graph {
-        let mut graph = Graph {
+        let graph = Graph {
             ops: Vec::new(),
             connections: HashSet::new(),
-            connections_point_cache: Vec::new(),
+            selection: None,
             root: None,
             total_ops: 0,
             dirty: false
@@ -49,48 +49,47 @@ impl Graph {
         self.dirty = false;
     }
 
-    /// Adds a new op to the network at coordinates `screen_position`
-    /// and dimensions `screen_size`.
-    pub fn add_op(&mut self, position: Vector2<f32>, size: Vector2<f32>) {
-        let op_type = match self.total_ops {
-            0 => OpType::Sphere,
-            1 => OpType::Box,
-            2 => OpType::SmoothMinimum,
-            _ => OpType::Render
-        };
-
+    /// Adds a new op of type `op_type` to the network at coordinates
+    /// `screen_position` and dimensions `screen_size`.
+    pub fn add_op(&mut self, op_type: OpType, position: Vector2<f32>, size: Vector2<f32>) {
         self.total_ops += 1;
-        println!("Total ops in network: {}", self.total_ops);
-        println!("Adding op with type: {}", op_type.to_string());
-
         self.ops.push(Op::new(op_type, position, size));
-        println!("Op name: {}", self.ops.last().unwrap().name)
+        //println!("Op name: {}", self.ops.last().unwrap().name)
     }
 
-    /// Draws a single op in the network.
-    fn draw_op(&self, op: &Op, renderer: &Renderer) {
-        // Pick a draw color based on the current interaction state of this operator
-        // and the op type.
-        let mut draw_color = match op.op_type {
+    /// Pick a draw color based on the current interaction state of this
+    /// operator and the op type.
+    fn color_for_op(&self, op: &Op) -> Color {
+        let mut color = match op.op_type {
             OpType::Sphere | OpType::Box | OpType::Plane => Color::new(0.77, 0.80, 1.0, 1.0),
             OpType::Union | OpType::Intersection | OpType::SmoothMinimum => Color::new(0.57, 0.60, 0.8, 1.0),
             OpType::Render => Color::new(0.99, 0.64, 0.45, 1.0)
         };
 
-        draw_color += match op.state {
-            InteractionState::Selected => Color::new(0.05, 0.05, 0.05, 0.0),
+        // Add a contribution based on the op's current interaction state.
+        color += match op.state {
+            InteractionState::Hover => Color::new(0.05, 0.05, 0.05, 0.0),
             _ => Color::zero()
         };
 
-       renderer.draw_rect(&op.region_operator, &draw_color);
+        color
+    }
 
+    /// Draws a single op in the network.
+    fn draw_op(&self, op: &Op, renderer: &Renderer) {
         // Draw the connection slot(s), if necessary.
-        draw_color = Color::new(0.31, 0.33, 0.48, 1.0);
+        let slot_color = Color::new(0.31, 0.33, 0.48, 1.0);
         match op.state {
-            InteractionState::ConnectSource => renderer.draw_rect(&op.region_slot_output, &draw_color),
-            InteractionState::ConnectDestination => renderer.draw_rect(&op.region_slot_input, &draw_color),
+            InteractionState::Selected => {
+                let aabb_select = op.aabb_op.expand_from_center(&Vector2::new(6.0, 6.0));
+                renderer.draw_rect(&aabb_select, &Color::new(0.1, 1.0, 0.4, 1.0));
+            },
+            InteractionState::ConnectSource => renderer.draw_rect(&op.aabb_slot_output, &slot_color),
+            InteractionState::ConnectDestination => renderer.draw_rect(&op.aabb_slot_input, &slot_color),
             _ => ()
         }
+
+        renderer.draw_rect(&op.aabb_op, &self.color_for_op(op));
     }
 
     /// Draws all ops in the network.
@@ -101,9 +100,30 @@ impl Graph {
     }
 
     /// Draws all connections between ops in the network.
-    fn draw_all_connections(&mut self, renderer: &Renderer) {
+    fn draw_all_connections(&self, renderer: &Renderer) {
+        let mut points = Vec::new();
+        for &(uuid_a, uuid_b) in &self.connections {
+            let op_a = self.get_op(uuid_a).unwrap();
+            let op_b = self.get_op(uuid_b).unwrap();
+            let centroid_a = op_a.aabb_slot_output.centroid();
+            let centroid_b = op_b.aabb_slot_input.centroid();
+
+            // Push back the first point.
+            points.push(centroid_a.x);
+            points.push(centroid_a.y);
+            points.push(0.0);
+            points.push(0.0);
+
+            // Push back the second point.
+            points.push(centroid_b.x);
+            points.push(centroid_b.y);
+            points.push(1.0);
+            points.push(1.0);
+        }
+
         let draw_color = Color::new(1.0, 1.0, 1.0, 1.0);
-        renderer.draw_line(&self.connections_point_cache, &draw_color);
+
+        renderer.draw_line(&points, &draw_color);
     }
 
     /// Draws all of the operators and connections that make
@@ -115,9 +135,9 @@ impl Graph {
 
     /// Returns an immutable reference to the op with the given
     /// UUID, if it exists in the graph.
-    pub fn get_op(&self, id: Uuid) -> Option<&Op> {
+    pub fn get_op(&self, uuid: Uuid) -> Option<&Op> {
         for op in self.ops.iter() {
-            if op.id == id {
+            if op.id == uuid {
                 return Some(op);
             }
         }
@@ -126,9 +146,9 @@ impl Graph {
 
     /// Returns an mutable reference to the op with the given
     /// UUID, if it exists in the graph.
-    pub fn get_op_mut(&mut self, id: Uuid) -> Option<&mut Op> {
+    pub fn get_op_mut(&mut self, uuid: Uuid) -> Option<&mut Op> {
         for op in self.ops.iter_mut() {
-            if op.id == id {
+            if op.id == uuid {
                 return Some(op);
             }
         }
@@ -137,25 +157,24 @@ impl Graph {
 
     /// Adds a new connection between two ops with UUIDs
     /// `a` and `b`, respectively.
-    pub fn add_connection(&mut self, a: Uuid, b: Uuid) {
+    pub fn add_connection(&mut self, uuid_a: Uuid, uuid_b: Uuid) {
         // First, find the two ops with matching UUIDs.
         let mut op_a: Option<&mut Op> = None;
         let mut op_b: Option<&mut Op> = None;
         for op in self.ops.iter_mut() {
-            if op.id == a {
+            if op.id == uuid_a {
                 op_a = Some(op);
-            }
-            else if op.id == b {
+            } else if op.id == uuid_b {
                 op_b = Some(op);
             }
         }
 
         if let (Some(src), Some(dst)) = (op_a, op_b) {
-            let src_pt = src.region_slot_output.centroid();
-            let dst_pt = dst.region_slot_input.centroid();
-
+            // Here, we only proceed if the connection was successful.
             if src.connect_to(dst) {
-                // Here, we only proceed if the connection was successful.
+
+                // If we are connecting to a render op, then the shader
+                // must be rebuilt.
                 if dst.op_type == OpType::Render {
                     self.root = Some(dst.id);
                     self.dirty = true;
@@ -166,18 +185,7 @@ impl Graph {
                 src.state = InteractionState::Unselected;
                 dst.state = InteractionState::Unselected;
 
-                // Push back the coordinates of the two connector slots: note
-                // that we also add texture coordinates here so that the layouts
-                // of the two buffers match.
-                self.connections_point_cache.push(src_pt.x);
-                self.connections_point_cache.push(src_pt.y);
-                self.connections_point_cache.push(0.0);
-                self.connections_point_cache.push(0.0);
-
-                self.connections_point_cache.push(dst_pt.x);
-                self.connections_point_cache.push(dst_pt.y);
-                self.connections_point_cache.push(1.0);
-                self.connections_point_cache.push(1.0);
+                self.connections.insert((uuid_a, uuid_b));
             } else {
                 println!("Connection unsuccessful");
             }
@@ -186,20 +194,16 @@ impl Graph {
         }
     }
 
-    pub fn handle_interaction(&mut self, mouse_position: Vector2<f32>, mouse_down: bool) {
-        // The user can only select a single operator at a time.
-        let mut found_selected = false;
+    pub fn handle_interaction(&mut self, mouse_info: &MouseInfo) {
         let mut connecting = false;
         let mut src_id = Uuid::nil();
         let mut dst_id = Uuid::nil();
 
         for mut op in self.ops.iter_mut() {
-
             // If this operator is currently being connected to another,
             // skip the rest of this loop.
             if let InteractionState::ConnectSource = op.state {
-                if mouse_down {
-                    found_selected = true;
+                if mouse_info.down {
                     connecting = true;
                     src_id = op.id;
 
@@ -207,20 +211,47 @@ impl Graph {
                 }
             }
 
-            if op.region_operator.inside(&mouse_position) && !found_selected {
-                // Otherwise, check to see if the user's mouse is within this
-                // operator's output slot region.
-                if op.region_slot_output.inside_with_padding(&mouse_position, 6.0) && mouse_down  {
-                    op.state = InteractionState::ConnectSource;
-                    src_id = op.id;
+            if op.aabb_op.inside(&mouse_info.curr) {
+                // Is this op the last one that was selected?
+                if let Some(uuid) = self.selection {
+                    if uuid == op.id  {
+                        if mouse_info.down {
+                            let velocity = mouse_info.curr - mouse_info.last;
+                            op.aabb_op.translate(&velocity);
+                            op.aabb_slot_input.translate(&velocity);
+                            op.aabb_slot_output.translate(&velocity);
+                        }
+                        continue;
+                    }
+                }
+
+                // Is the mouse down?
+                if mouse_info.down {
+                    // Are we inside the bounds of this op's output slot?
+                    if op.aabb_slot_output.inside_with_padding(&mouse_info.curr, 12.0) {
+                        op.state = InteractionState::ConnectSource;
+
+                        // Store the connection source UUID.
+                        src_id = op.id;
+                    } else {
+                        op.state = InteractionState::Selected;
+
+                        // Store the UUID of the op that was selected.
+                        self.selection = Some(op.id);
+                    }
                 }
                 else {
-                    op.state = InteractionState::Selected;
+                    // Otherwise, the mouse is still inside the bounds of this op,
+                    // so we must be hovering over it.
+                    op.state = InteractionState::Hover;
                 }
-                found_selected = true;
             }
             else {
-                op.state = InteractionState::Unselected;
+                if let Some(uuid) = self.selection {
+                    if uuid != op.id {
+                        op.state = InteractionState::Unselected;
+                    }
+                }
             }
         }
 
@@ -228,23 +259,21 @@ impl Graph {
         // check if a potential connection has happened (i.e. the mouse
         // is now over an input slot of a different operator).
         let mut found_new_connection = false;
+
         if connecting {
-            for op_destination in self.ops.iter_mut() {
+            for op in self.ops.iter_mut() {
                 // Make sure that the user is not trying to connect an operator to itself.
-                if op_destination.region_slot_input.inside_with_padding(&mouse_position, 6.0) &&
-                   src_id != op_destination.id {
+                if op.aabb_slot_input.inside_with_padding(&mouse_info.curr, 6.0) &&
+                   src_id != op.id {
 
-                    op_destination.state = InteractionState::ConnectDestination;
+                    op.state = InteractionState::ConnectDestination;
+                    dst_id = op.id;
 
-                    dst_id = op_destination.id;
-
-                    // Only add the connection if it doesn't already exist in the hash set.
-                    if !self.connections.contains(&(src_id, dst_id)) {
-                        self.connections.insert((src_id, dst_id));
+                    // Only add the connection if it doesn't already exist in the hash set
+                    // and the destination op actually accepts inputs.
+                    if !self.connections.contains(&(src_id, dst_id)) &&
+                        op.op_type.has_inputs() {
                         found_new_connection = true;
-                    }
-                    else {
-                        println!("Hash set already contains the ID pair: {:?}", (src_id, dst_id));
                     }
                 }
 

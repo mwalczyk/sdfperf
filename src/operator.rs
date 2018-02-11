@@ -7,32 +7,6 @@ use uuid::Uuid;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-struct OpInfo {
-    /// A unique, numeric identifier - no two ops will have the same UUID
-    pub id: Uuid,
-
-    /// The IDs of all ops that are connected to this op
-    pub input_connection_ids: Vec<Uuid>,
-
-    /// The IDs of all ops that this op connects to
-    pub output_connection_ids: Vec<Uuid>,
-
-    /// The user-defined name of this operator
-    pub name: String,
-
-    /// The bounding box of the op
-    pub aabb_op: BoundingRect,
-
-    /// The bounding box of the op's input slot
-    pub aabb_slot_input: BoundingRect,
-
-    /// The bounding box of the op's output slot
-    pub aabb_slot_output: BoundingRect,
-
-    /// The current interaction state of the op
-    pub state: InteractionState
-}
-
 #[derive(PartialEq, Eq)]
 pub enum OpType {
     /// Generates a sphere primitive
@@ -145,9 +119,17 @@ impl OpType {
     }
 }
 
+pub struct MouseInfo {
+    pub curr: Vector2<f32>,
+    pub last: Vector2<f32>,
+    pub clicked: Vector2<f32>,
+    pub down: bool
+}
+
 pub enum InteractionState {
     Unselected,
     Selected,
+    Hover,
     ConnectSource,
     ConnectDestination
 }
@@ -157,14 +139,31 @@ trait InterfaceElement {
 }
 
 pub struct Op {
-    pub input_connection_ids: Vec<Uuid>,
-    pub output_connection_ids: Vec<Uuid>,
-    pub region_operator: BoundingRect,
-    pub region_slot_input: BoundingRect,
-    pub region_slot_output: BoundingRect,
+    /// The IDs of all ops that are connected to this op
+    pub input_uuids: Vec<Uuid>,
+
+    /// The IDs of all ops that this op connects to
+    pub output_uuids: Vec<Uuid>,
+
+    /// The bounding box of the op
+    pub aabb_op: BoundingRect,
+
+    /// The bounding box of the op's input slot
+    pub aabb_slot_input: BoundingRect,
+
+    /// The bounding box of the op's output slot
+    pub aabb_slot_output: BoundingRect,
+
+    /// The current interaction state of the op
     pub state: InteractionState,
+
+    /// A unique, numeric identifier - no two ops will have the same UUID
     pub id: Uuid,
+
+    /// The name of the op (i.e. "sphere_0")
     pub name: String,
+
+    /// The op type
     pub op_type: OpType
 }
 
@@ -175,22 +174,22 @@ impl Op {
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
         // The bounding region of the op itself
-        let region_operator = BoundingRect::new(upper_left, size);
+        let aabb_op = BoundingRect::new(upper_left, size);
 
         // The small bounding region of the input connection slot for this operator
-        let region_slot_input = BoundingRect::new(Vector2::new(upper_left.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
+        let aabb_slot_input = BoundingRect::new(Vector2::new(upper_left.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
                                                                SLOT_SIZE);
 
         // The small bounding region of the output connection slot for this operator
-        let region_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
+        let aabb_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
                                                                 SLOT_SIZE);
         Op {
-            input_connection_ids: Vec::new(),
-            output_connection_ids: Vec::new(),
-            region_operator,
-            region_slot_input,
-            region_slot_output,
-            state: InteractionState::Selected,
+            input_uuids: Vec::new(),
+            output_uuids: Vec::new(),
+            aabb_op,
+            aabb_slot_input,
+            aabb_slot_output,
+            state: InteractionState::Unselected,
             id: Uuid::new_v4(),
             name: format!("{}_{}", op_type.to_string(), count),
             op_type
@@ -200,15 +199,15 @@ impl Op {
     /// Returns the number of ops that are connected to this
     /// op in the current graph
     fn get_number_of_active_inputs(&self) -> usize {
-        self.input_connection_ids.len()
+        self.input_uuids.len()
     }
 
     pub fn connect_to(&mut self, other: &mut Op) -> bool {
         // Make sure that this op's output slot is active and the
         // other op's input slot isn't already at capacity.
         if self.op_type.has_outputs() && other.get_number_of_active_inputs() < other.op_type.get_input_capacity() {
-            self.output_connection_ids.push(other.id);
-            other.input_connection_ids.push(self.id);
+            self.output_uuids.push(other.id);
+            other.input_uuids.push(self.id);
 
             return true;
         }

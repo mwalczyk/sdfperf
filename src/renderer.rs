@@ -162,7 +162,7 @@ impl Renderer {
             network_zoom: 1.0,
             network_resolution: Vector2::new(800.0, 600.0),
             preview_program: None,
-            preview: BoundingRect::new(Vector2::new(200.0, 100.0),Vector2::new(200.0, 200.0)),
+            preview: BoundingRect::new(Vector2::new(100.0, 000.0),Vector2::new(300.0, 300.0)),
             time: SystemTime::now()
         };
 

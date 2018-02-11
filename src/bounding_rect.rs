@@ -18,12 +18,20 @@ impl BoundingRect {
         BoundingRect { upper_left, size }
     }
 
-    pub fn set_upper_left(&mut self, to: Vector2<f32>) {
-        self.upper_left = to;
+    pub fn expand_from_center(&self, incr: &Vector2<f32>) -> BoundingRect {
+        BoundingRect::new(self.upper_left - incr * 0.5, self.size + incr)
     }
 
-    pub fn set_size(&mut self, to: Vector2<f32>) {
-        self.size = to;
+    pub fn translate(&mut self, offset: &Vector2<f32>) {
+        self.upper_left += *offset;
+    }
+
+    pub fn set_upper_left(&mut self, to: &Vector2<f32>) {
+        self.upper_left = *to;
+    }
+
+    pub fn set_size(&mut self, to: &Vector2<f32>) {
+        self.size = *to;
     }
 
     pub fn inside(&self, point: &Vector2<f32>) -> bool {

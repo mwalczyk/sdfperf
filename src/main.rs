@@ -16,7 +16,7 @@ mod shader_builder;
 mod shader_string;
 
 use graph::Graph;
-use operator::{Op, OpType};
+use operator::{Op, OpType, MouseInfo};
 use program::Program;
 use renderer::Renderer;
 use shader_builder::ShaderBuilder;
@@ -48,13 +48,16 @@ fn main() {
     // Constants
     const ZOOM_INCREMENT: f32 = 0.05;
     const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
-
-    // Store interaction state
-    let mut mouse_down = false;
-    let mut mouse_position = Vector2::zero();
-    let mut last_clicked = Vector2::zero();
     let mut current_zoom = 1.0;
     let mut current_size = Vector2::new(800.0, 600.0);
+
+    // Store interaction state
+    let mut mouse_info = MouseInfo {
+        curr: Vector2::zero(),
+        last: Vector2::zero(),
+        clicked: Vector2::zero(),
+        down: false
+    };
 
     loop {
         events_loop.poll_events(|event| {
@@ -70,13 +73,14 @@ fn main() {
 
                     glutin::WindowEvent::MouseMoved { position, .. } => {
                         // Store the current mouse position.
-                        mouse_position = Vector2::new(position.0 as f32, position.1 as f32);
+                        mouse_info.last = mouse_info.curr;
+                        mouse_info.curr = Vector2::new(position.0 as f32, position.1 as f32);
 
                         // Zero center and zoom.
-                        mouse_position -= current_size * 0.5;
-                        mouse_position *= current_zoom;
+                        mouse_info.curr -= current_size * 0.5;
+                        mouse_info.curr *= current_zoom;
 
-                        graph.handle_interaction(mouse_position, mouse_down);
+                        graph.handle_interaction(&mouse_info);
                     },
 
                     glutin::WindowEvent::MouseWheel {delta, .. } => {
@@ -95,23 +99,30 @@ fn main() {
 
                         if let glutin::ElementState::Pressed = state {
                             // Store the current mouse position.
-                            last_clicked = mouse_position;
-                            mouse_down = true;
+                            mouse_info.clicked = mouse_info.curr;
+                            mouse_info.down = true;
 
-                            graph.handle_interaction(last_clicked, mouse_down);
+                            graph.handle_interaction(&mouse_info);
                         }
                         else {
-                            mouse_down = false;
+                            mouse_info.down = false;
                         }
                     },
 
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         if let glutin::ElementState::Pressed = input.state {
                             if let Some(key) = input.virtual_keycode {
-                                match key {
-                                    glutin::VirtualKeyCode::A => graph.add_op(mouse_position - OPERATOR_SIZE * 0.5, OPERATOR_SIZE),
-                                    _ => ()
-                                }
+                                let op_type = match key {
+                                    glutin::VirtualKeyCode::S => OpType::Sphere,
+                                    glutin::VirtualKeyCode::B => OpType::Box,
+                                    glutin::VirtualKeyCode::P => OpType::Plane,
+                                    glutin::VirtualKeyCode::U => OpType::Union,
+                                    glutin::VirtualKeyCode::I => OpType::Intersection,
+                                    glutin::VirtualKeyCode::M => OpType::SmoothMinimum,
+                                    glutin::VirtualKeyCode::R => OpType::Render,
+                                    _ => OpType::Sphere
+                                };
+                                graph.add_op(op_type,mouse_info.curr - OPERATOR_SIZE * 0.5, OPERATOR_SIZE);
                             }
                         }
                     }
@@ -125,7 +136,7 @@ fn main() {
 
         // Check to see if the graph needs to be rebuilt.
         if graph.dirty() {
-            let program = shader_builder.traverse(&graph);
+            let program = shader_builder.traverse_postorder(&graph);
             renderer.set_preview_program(program);
 
             graph.clean();
