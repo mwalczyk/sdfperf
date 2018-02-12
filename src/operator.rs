@@ -84,7 +84,7 @@ impl OpType {
         // i.e. the variable used in the `map` function.
         match *self {
             OpType::Sphere => "float {} = sdf_sphere(p, vec3(0.0), 5.0);".to_string(),
-            OpType::Box => "float {} = sdf_box(p, vec3(3.0));".to_string(),
+            OpType::Box => "float {} = sdf_box(p, vec3(4.0));".to_string(),
             OpType::Plane => "float {} = sdf_plane(p, {}, {});".to_string(),
             OpType::Union => "float {} = op_union({}, {});".to_string(),
             OpType::Intersection => "float {} = op_intersect({}, {});".to_string(),
@@ -97,9 +97,9 @@ impl OpType {
     /// corresponding to this op type.
     pub fn get_number_of_entries(&self) -> usize {
         match *self {
-            OpType::Sphere | OpType::Box => 1,
-            OpType::Render => 2,
-            _ => 3
+            OpType::Sphere | OpType::Box | OpType::Plane => 1,
+            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => 3,
+            OpType::Render => 2
         }
     }
 
@@ -127,7 +127,7 @@ pub struct MouseInfo {
 }
 
 pub enum InteractionState {
-    Unselected,
+    Deselected,
     Selected,
     Hover,
     ConnectSource,
@@ -170,7 +170,7 @@ pub struct Op {
 impl Op {
 
     pub fn new(op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
-        const SLOT_SIZE: Vector2<f32> = Vector2{ x: 6.0, y: 6.0 };
+        const SLOT_SIZE: Vector2<f32> = Vector2{ x: 12.0, y: 12.0 };
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
         // The bounding region of the op itself
@@ -178,18 +178,18 @@ impl Op {
 
         // The small bounding region of the input connection slot for this operator
         let aabb_slot_input = BoundingRect::new(Vector2::new(upper_left.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
-                                                               SLOT_SIZE);
+                                                            SLOT_SIZE);
 
         // The small bounding region of the output connection slot for this operator
         let aabb_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
-                                                                SLOT_SIZE);
+                                                            SLOT_SIZE);
         Op {
             input_uuids: Vec::new(),
             output_uuids: Vec::new(),
             aabb_op,
             aabb_slot_input,
             aabb_slot_output,
-            state: InteractionState::Unselected,
+            state: InteractionState::Deselected,
             id: Uuid::new_v4(),
             name: format!("{}_{}", op_type.to_string(), count),
             op_type
@@ -202,6 +202,12 @@ impl Op {
         self.input_uuids.len()
     }
 
+    /// Connects this op to `other`. Returns `true` if the
+    /// connection was successful and `false` otherwise.
+    ///
+    /// Connecting will fail if `other` has reached its
+    /// input capacity or this op does not have any
+    /// outputs.
     pub fn connect_to(&mut self, other: &mut Op) -> bool {
         // Make sure that this op's output slot is active and the
         // other op's input slot isn't already at capacity.
@@ -214,9 +220,13 @@ impl Op {
         false
     }
 
-    pub fn set_screen_position(&mut self, position: &Vector2<f32>) {
-        // ..
-        // Rebuild the two bounding rectangles - or translate them (create a bounding rectangle member function for this)
+    /// Translates the op in the network editor by an amount
+    /// `offset`. Internally, this translates each of the
+    /// bounding rectangles that are owned by this op.
+    pub fn translate(&mut self, offset: &Vector2<f32>) {
+        self.aabb_op.translate(offset);
+        self.aabb_slot_input.translate(offset);
+        self.aabb_slot_output.translate(offset);
     }
 }
 

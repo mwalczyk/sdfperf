@@ -11,10 +11,12 @@ mod program;
 mod operator;
 mod graph;
 mod bounding_rect;
+mod color;
 mod renderer;
 mod shader_builder;
 mod shader_string;
 
+use color::Color;
 use graph::Graph;
 use operator::{Op, OpType, MouseInfo};
 use program::Program;
@@ -26,14 +28,15 @@ use cgmath::{Vector2, Zero};
 
 fn clear() {
     unsafe {
-        gl::ClearColor(0.41, 0.44, 0.61, 1.0);
+        let clear = Color::from_hex(0x2B2B2B);
+        gl::ClearColor(clear.r, clear.g, clear.b, clear.a);
         gl::Clear(gl::COLOR_BUFFER_BIT);
     }
 }
 
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new().with_dimensions(800, 600);
+    let window = glutin::WindowBuilder::new().with_dimensions(800, 600).with_title("sdfperf");
     let context = glutin::ContextBuilder::new().with_multisampling(4);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
@@ -111,18 +114,24 @@ fn main() {
 
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         if let glutin::ElementState::Pressed = input.state {
+
                             if let Some(key) = input.virtual_keycode {
-                                let op_type = match key {
-                                    glutin::VirtualKeyCode::S => OpType::Sphere,
-                                    glutin::VirtualKeyCode::B => OpType::Box,
-                                    glutin::VirtualKeyCode::P => OpType::Plane,
-                                    glutin::VirtualKeyCode::U => OpType::Union,
-                                    glutin::VirtualKeyCode::I => OpType::Intersection,
-                                    glutin::VirtualKeyCode::M => OpType::SmoothMinimum,
-                                    glutin::VirtualKeyCode::R => OpType::Render,
-                                    _ => OpType::Sphere
-                                };
-                                graph.add_op(op_type,mouse_info.curr - OPERATOR_SIZE * 0.5, OPERATOR_SIZE);
+                                if input.modifiers.shift {
+                                    let op_type = match key {
+                                        glutin::VirtualKeyCode::S => OpType::Sphere,
+                                        glutin::VirtualKeyCode::B => OpType::Box,
+                                        glutin::VirtualKeyCode::P => OpType::Plane,
+                                        glutin::VirtualKeyCode::U => OpType::Union,
+                                        glutin::VirtualKeyCode::I => OpType::Intersection,
+                                        glutin::VirtualKeyCode::M => OpType::SmoothMinimum,
+                                        glutin::VirtualKeyCode::R => OpType::Render,
+                                        _ => OpType::Sphere
+                                    };
+                                    graph.add_op(op_type,mouse_info.curr - OPERATOR_SIZE * 0.5, OPERATOR_SIZE);
+                                }
+                                if let Some(glutin::VirtualKeyCode::Delete) = input.virtual_keycode {
+                                    graph.delete_selected();
+                                }
                             }
                         }
                     }

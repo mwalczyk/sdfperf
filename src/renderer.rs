@@ -3,6 +3,7 @@ use gl::types::*;
 use cgmath::{self, Matrix, Matrix4, SquareMatrix, One, PerspectiveFov, Vector2, Vector4, Zero };
 
 use bounding_rect::BoundingRect;
+use color::Color;
 use program::Program;
 
 use std::mem;
@@ -10,8 +11,6 @@ use std::ptr;
 use std::os::raw::c_void;
 use std::ffi::CString;
 use std::time::{Duration, SystemTime};
-
-type Color = Vector4<f32>;
 
 pub struct Renderer {
     /// The shader program that will be used to render sprites
@@ -103,7 +102,7 @@ impl Renderer {
                 alpha = 1.0;
                 break;
             case 1:
-                alpha = step(0.5, fract(uv.s * 20.0 - u_time));
+                alpha = step(0.5, fract(uv.s * 20.0 - u_time)) + 0.4;
                 break;
             }
             o_color = vec4(u_draw_color.rgb, alpha);
@@ -235,7 +234,7 @@ impl Renderer {
         let model = rect.get_model_matrix();
         self.program.uniform_matrix_4f("u_model_matrix", &model);
         self.program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        self.program.uniform_4f("u_draw_color", &color);
+        self.program.uniform_4f("u_draw_color", &(*color).into());
         self.program.uniform_1ui("u_draw_mode", 0);
         self.program.uniform_1f("u_time", self.get_elapsed_seconds());
 
@@ -258,7 +257,7 @@ impl Renderer {
         let model = Matrix4::identity();
         self.program.uniform_matrix_4f("u_model_matrix", &model);
         self.program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        self.program.uniform_4f("u_draw_color", &color);
+        self.program.uniform_4f("u_draw_color", &(*color).into());
         self.program.uniform_1ui("u_draw_mode", 1);
         self.program.uniform_1f("u_time", self.get_elapsed_seconds());
 
