@@ -2,7 +2,7 @@ use cgmath::{self, Vector2, Vector4, Zero };
 use uuid::Uuid;
 
 use color::Color;
-use operator::{Op, OpType, MouseInfo, InteractionState};
+use operator::{Op, OpType, OpIndex, MouseInfo, InteractionState};
 use renderer::Renderer;
 
 use std::collections::HashSet;
@@ -17,33 +17,18 @@ use std::collections::HashSet;
 /// Selection:   0x76B264 (green)
 /// Other:       0xFEC56D (yellow)
 ///
-struct Index(usize);
-
-struct Node<T> {
-    data: T,
-    outputs: Vec<Index>,
-    inputs: Vec<Index>
-}
-
-struct Arena<T> {
-    nodes: Vec<Node<T>>
-}
-
 pub struct Graph {
     /// A memory arena that contains all of the ops
     pub ops: Vec<Op>,
 
     /// An adjacency list of connections between nodes
-    pub connections: HashSet<(Uuid, Uuid)>,
+    pub connections: HashSet<(OpIndex, OpIndex)>,
 
     /// The UUID of the currently selected op (if there is one)
-    pub selection: Option<Uuid>,
+    pub selection: Option<OpIndex>,
 
     /// The UUID of the root op (if there is one)
-    pub root: Option<Uuid>,
-
-    /// The total number of ops in the graph
-    total_ops: usize,
+    pub root: Option<OpIndex>,
 
     /// A flag that control whether or not the shader graph
     /// needs to be rebuilt
@@ -59,7 +44,6 @@ impl Graph {
             connections: HashSet::new(),
             selection: None,
             root: None,
-            total_ops: 0,
             dirty: false
         };
 
@@ -78,33 +62,33 @@ impl Graph {
     }
 
     pub fn delete_selected(&mut self) {
-        // Is there an op currently selected?
-        if let Some(selected_uuid) = self.selection {
-
-            let mut remove_index = None;
-            for (index, op) in self.ops.iter().enumerate() {
-                if op.id == selected_uuid {
-                    remove_index = Some(index);
-                    break;
-                }
-            }
-
-            if let Some(index) = remove_index {
-                self.ops.remove(index);
-
-                for &(uuid_a, uuid_b) in &self.connections {
-
-                }
-            }
-
-        }
+//        // Is there an op currently selected?
+//        if let Some(selected_uuid) = self.selection {
+//
+//            let mut remove_index = None;
+//            for (index, op) in self.ops.iter().enumerate() {
+//                if op.id == selected_uuid {
+//                    remove_index = Some(index);
+//                    break;
+//                }
+//            }
+//
+//            if let Some(index) = remove_index {
+//                self.ops.remove(index);
+//
+//                for &(uuid_a, uuid_b) in &self.connections {
+//
+//                }
+//            }
+//
+//        }
     }
 
     /// Adds a new op of type `op_type` to the network at coordinates
     /// `screen_position` and dimensions `screen_size`.
     pub fn add_op(&mut self, op_type: OpType, position: Vector2<f32>, size: Vector2<f32>) {
-        self.total_ops += 1;
-        self.ops.push(Op::new(op_type, position, size));
+        let index = OpIndex(self.ops.len());
+        self.ops.push(Op::new(index, op_type,position, size));
     }
 
     /// Pick a draw color based on the current interaction state of this
@@ -189,49 +173,48 @@ impl Graph {
 
     /// Returns an immutable reference to the op with the given
     /// UUID, if it exists in the graph.
-    pub fn get_op(&self, uuid: Uuid) -> Option<&Op> {
-        self.ops.iter().find(|op| op.id == uuid)
+    pub fn get_op(&self, index: OpIndex) -> Option<&Op> {
+        self.ops.get(index.0)
     }
 
     /// Returns an mutable reference to the op with the given
     /// UUID, if it exists in the graph.
-    pub fn get_op_mut(&mut self, uuid: Uuid) -> Option<&mut Op> {
-        self.ops.iter_mut().find(|op| op.id == uuid)
+    pub fn get_op_mut(&mut self, index: OpIndex) -> Option<&mut Op> {
+        self.ops.get_mut(index.0)
     }
 
     /// Adds a new connection between two ops with UUIDs
     /// `a` and `b`, respectively.
-    pub fn add_connection(&mut self, uuid_a: Uuid, uuid_b: Uuid) {
-        // First, find the two ops with matching UUIDs.
-        let mut op_a: Option<&mut Op> = None;
-        let mut op_b: Option<&mut Op> = None;
+    pub fn add_connection(&mut self, src: OpIndex, dst: OpIndex) {
+        // First, find the two ops with matching indices.
+        let mut src_op: Option<&mut Op> = None;
+        let mut dst_op: Option<&mut Op> = None;
         for op in self.ops.iter_mut() {
-            if op.id == uuid_a {
-                op_a = Some(op);
-            } else if op.id == uuid_b {
-                op_b = Some(op);
+            if op.index == src {
+                src_op = Some(op);
+            } else if op.index == dst {
+                dst_op = Some(op);
             }
         }
 
-        if let (Some(src), Some(dst)) = (op_a, op_b) {
+        if let (Some(src_op), Some(dst_op)) = (src_op, dst_op) {
             // Here, we only proceed if the connection was successful.
-            if src.connect_to(dst) {
+            if src_op.connect_to(dst_op) {
 
                 // If we are connecting to a render op, then the shader
                 // must be rebuilt.
-                if dst.op_type == OpType::Render {
-                    self.root = Some(dst.id);
+                if dst_op.op_type == OpType::Render {
+                    self.root = Some(dst_op.index);
                     self.dirty = true;
                     println!("Connected to render node: building graph");
                 }
 
                 // Deselect both ops.
-                src.state = InteractionState::Deselected;
-                dst.state = InteractionState::Deselected;
-                self.connections.insert((uuid_a, uuid_b));
+                src_op.state = InteractionState::Deselected;
+                dst_op.state = InteractionState::Deselected;
 
-            } else {
-                println!("Connection unsuccessful");
+                // Add the new connection.
+                self.connections.insert((src, dst));
             }
         } else {
             println!("Attempting to connect two ops with non-existent UUIDs - something is wrong here")
@@ -240,10 +223,10 @@ impl Graph {
 
     pub fn handle_interaction(&mut self, mouse_info: &MouseInfo) {
         let mut connecting = false;
-        let mut src_id = Uuid::nil();
-        let mut dst_id = Uuid::nil();
+        let mut src = OpIndex(0);
+        let mut dst = OpIndex(0);
 
-        for mut op in self.ops.iter_mut() {
+        for (index, op) in self.ops.iter_mut().enumerate() {
 
             if let InteractionState::ConnectSource = op.state {
                 if mouse_info.down {
@@ -253,7 +236,7 @@ impl Graph {
                     // 2) Store its UUID as a potential connect source
                     // 3) Skip the rest of this loop iteration
                     connecting = true;
-                    src_id = op.id;
+                    src = OpIndex::from(index);
                     continue;
                 } else {
                     // Otherwise, deselect this op
@@ -265,10 +248,10 @@ impl Graph {
             if op.aabb_op.inside(&mouse_info.curr) {
 
                 // Is there an op currently selected?
-                if let Some(uuid) = self.selection {
+                if let Some(selected) = self.selection {
 
                     // Is this op the selected op?
-                    if uuid == op.id  {
+                    if selected == OpIndex::from(index)  {
 
                         // Is the mouse down?
                         if mouse_info.down {
@@ -288,14 +271,14 @@ impl Graph {
                         op.state = InteractionState::ConnectSource;
 
                         // Store the connection source UUID.
-                        src_id = op.id;
+                        src = OpIndex::from(index);
 
                     } else {
                         // This op has been selected.
                         op.state = InteractionState::Selected;
 
                         // Store the selected UUID.
-                        self.selection = Some(op.id);
+                        self.selection = Some(OpIndex::from(index));
                     }
                 }
                 else {
@@ -308,10 +291,10 @@ impl Graph {
             } else {
 
                 // Is there an op currently selected?
-                if let Some(uuid) = self.selection {
+                if let Some(selected) = self.selection {
 
                     // Is this op the selected op?
-                    if uuid == op.id {
+                    if selected == OpIndex::from(index) {
                         // Keep this op selected.
                         op.state = InteractionState::Selected;
                     } else {
@@ -328,19 +311,17 @@ impl Graph {
         let mut found_new_connection = false;
 
         if connecting {
-            for op in self.ops.iter_mut() {
+            for (index, op) in self.ops.iter_mut().enumerate() {
 
                 // Make sure that the user is not trying to connect an operator to itself.
-                if op.aabb_slot_input.inside_with_padding(&mouse_info.curr, 6.0) &&
-                   src_id != op.id {
-
+                if op.aabb_slot_input.inside_with_padding(&mouse_info.curr, 6.0) && src != OpIndex::from(index) {
                     op.state = InteractionState::ConnectDestination;
-                    dst_id = op.id;
+                    dst = OpIndex::from(index);
 
                     // Only add the connection if:
                     // 1) It doesn't already exist in the hash set
                     // 2) The destination op actually accepts inputs
-                    if !self.connections.contains(&(src_id, dst_id)) && op.op_type.has_inputs() {
+                    if !self.connections.contains(&(src, dst)) && op.op_type.has_inputs() {
                         found_new_connection = true;
                     }
                 }
@@ -349,7 +330,7 @@ impl Graph {
         }
 
         if found_new_connection {
-            self.add_connection(src_id, dst_id);
+            self.add_connection(src, dst);
         }
     }
 }

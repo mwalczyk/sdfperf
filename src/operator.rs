@@ -7,6 +7,25 @@ use uuid::Uuid;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Copy, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub struct OpIndex(pub usize);
+
+impl From<usize> for OpIndex {
+    fn from(sz: usize) -> Self {
+        OpIndex(sz)
+    }
+}
+
+struct Node<T> {
+    data: T,
+    outputs: Vec<OpIndex>,
+    inputs: Vec<OpIndex>
+}
+
+struct Arena<T> {
+    nodes: Vec<Node<T>>
+}
+
 #[derive(PartialEq, Eq)]
 pub enum OpType {
     /// Generates a sphere primitive
@@ -139,11 +158,14 @@ trait InterfaceElement {
 }
 
 pub struct Op {
-    /// The IDs of all ops that are connected to this op
-    pub input_uuids: Vec<Uuid>,
+    /// The index of this op in the memory arena
+    pub index: OpIndex,
 
-    /// The IDs of all ops that this op connects to
-    pub output_uuids: Vec<Uuid>,
+    /// The indices of all ops that are connected to this op
+    pub input_indices: Vec<OpIndex>,
+
+    /// The indices of all ops that this op connects to
+    pub output_indices: Vec<OpIndex>,
 
     /// The bounding box of the op
     pub aabb_op: BoundingRect,
@@ -158,7 +180,7 @@ pub struct Op {
     pub state: InteractionState,
 
     /// A unique, numeric identifier - no two ops will have the same UUID
-    pub id: Uuid,
+    pub uuid: Uuid,
 
     /// The name of the op (i.e. "sphere_0")
     pub name: String,
@@ -169,7 +191,7 @@ pub struct Op {
 
 impl Op {
 
-    pub fn new(op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
+    pub fn new(index: OpIndex, op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
         const SLOT_SIZE: Vector2<f32> = Vector2{ x: 12.0, y: 12.0 };
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
@@ -184,13 +206,14 @@ impl Op {
         let aabb_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
                                                             SLOT_SIZE);
         Op {
-            input_uuids: Vec::new(),
-            output_uuids: Vec::new(),
+            index,
+            input_indices: Vec::new(),
+            output_indices: Vec::new(),
             aabb_op,
             aabb_slot_input,
             aabb_slot_output,
             state: InteractionState::Deselected,
-            id: Uuid::new_v4(),
+            uuid: Uuid::new_v4(),
             name: format!("{}_{}", op_type.to_string(), count),
             op_type
         }
@@ -199,7 +222,7 @@ impl Op {
     /// Returns the number of ops that are connected to this
     /// op in the current graph
     fn get_number_of_active_inputs(&self) -> usize {
-        self.input_uuids.len()
+        self.input_indices.len()
     }
 
     /// Connects this op to `other`. Returns `true` if the
@@ -212,8 +235,8 @@ impl Op {
         // Make sure that this op's output slot is active and the
         // other op's input slot isn't already at capacity.
         if self.op_type.has_outputs() && other.get_number_of_active_inputs() < other.op_type.get_input_capacity() {
-            self.output_uuids.push(other.id);
-            other.input_uuids.push(self.id);
+            self.output_indices.push(other.index);
+            other.input_indices.push(self.index);
 
             return true;
         }

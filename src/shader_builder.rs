@@ -1,5 +1,5 @@
 use graph::Graph;
-use operator::{Op, OpType};
+use operator::{Op, OpType, OpIndex};
 use program::Program;
 use uuid::Uuid;
 
@@ -19,37 +19,37 @@ impl ShaderBuilder {
     /// returning the shader program that is described by the
     /// current network.
     pub fn traverse(&mut self, graph: &Graph) -> Option<Program> {
-        let mut uuids = Vec::new();
+        let mut indices = Vec::new();
 
         // Is there an active render node in this graph?
-        if let Some(root_uuid) = graph.root {
-            let root = graph.get_op(root_uuid).unwrap();
+        if let Some(root) = graph.root {
+            let root_op = graph.get_op(root).unwrap();
 
             // Traverse the graph, starting at the root op.
-            self.recurse(graph, root, &mut uuids);
+            self.recurse(graph, root_op, &mut indices);
         }
 
-        let (vs_src, fs_src) = self.build_sources(graph, uuids);
+        let (vs_src, fs_src) = self.build_sources(graph, indices);
 
         Program::new(vs_src, fs_src)
     }
 
     /// Examine a `root` op's inputs and recurse backwards until
     /// reaching a leaf node (i.e. an op with no other inputs).
-    fn recurse(&self, graph: &Graph, root: &Op, uuids: &mut Vec<Uuid>) {
+    fn recurse(&self, graph: &Graph, root: &Op, indices: &mut Vec<OpIndex>) {
         if root.op_type.has_inputs() {
-            for input_id in &root.input_uuids {
-                self.recurse(graph, graph.get_op(*input_id).unwrap(), uuids);
+            for index in &root.input_indices {
+                self.recurse(graph, graph.get_op(*index).unwrap(), indices);
             }
         }
 
-        // Finally, push back the root op's UUID.
-        uuids.push(root.id);
+        // Finally, push back the root op's index.
+        indices.push(root.index);
     }
 
-    /// Given a list of op UUIDs in the proper post-order, builds
+    /// Given a list of op indices in the proper post-order, builds
     /// and returns the appropriate shader code.
-    fn build_sources(&mut self, graph: &Graph, uuids: Vec<Uuid>) -> (String, String) {
+    fn build_sources(&mut self, graph: &Graph, indices: Vec<OpIndex>) -> (String, String) {
 
         // TODO: each op will need something like this as part of its shader code
         static TRANSFORMS: &str = "
@@ -211,8 +211,8 @@ impl ShaderBuilder {
             o_color = vec4(color, 1.0);
         }";
 
-        for uuid in uuids {
-            if let Some(op) = graph.get_op(uuid) {
+        for index in indices {
+            if let Some(op) = graph.get_op(index) {
                 // Append this op's line of shader code with a leading
                 // tab and trailing newline.
                 let mut formatted = match op.op_type {
@@ -224,21 +224,21 @@ impl ShaderBuilder {
                     },
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
-                        let uuid_a = op.input_uuids[0];
-                        let uuid_b = op.input_uuids[1];
+                        let src_a = op.input_indices[0];
+                        let src_b = op.input_indices[1];
                         op.op_type.get_formatted(vec![
                             op.name.clone(),                                 // This op's name
-                            graph.get_op(uuid_a).unwrap().name.clone(), // The name of this op's 1st input
-                            graph.get_op(uuid_b).unwrap().name.clone()  // The name of this op's 2nd input
+                            graph.get_op(src_a).unwrap().name.clone(), // The name of this op's 1st input
+                            graph.get_op(src_b).unwrap().name.clone()  // The name of this op's 2nd input
                         ])
                     }
 
                     OpType::Render => {
-                        let uuid = op.input_uuids[0];
-                        let name = graph.get_op(uuid).unwrap().name.clone();
+                        let src = op.input_indices[0];
+                        let name = graph.get_op(src).unwrap().name.clone();
                         let mut code = op.op_type.get_formatted(vec![
-                            op.name.clone(),    // This op's name
-                            name                // The input op's name
+                            op.name.clone(),                                // This op's name
+                            name                                            // The input op's name
                         ]);
 
                         // Add the final `return` in the `map(..)` function.
