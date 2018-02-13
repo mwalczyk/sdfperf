@@ -116,7 +116,9 @@ fn main() {
                         if let glutin::ElementState::Pressed = input.state {
 
                             if let Some(key) = input.virtual_keycode {
-                                if input.modifiers.shift {
+
+                                // TODO: there seems to be an issue with the `shift` key on certain machines
+                                if input.modifiers.shift && key != glutin::VirtualKeyCode::LShift {
                                     let op_type = match key {
                                         glutin::VirtualKeyCode::S => OpType::Sphere,
                                         glutin::VirtualKeyCode::B => OpType::Box,
@@ -145,7 +147,7 @@ fn main() {
 
         // Check to see if the graph needs to be rebuilt.
         if graph.dirty() {
-            let program = shader_builder.traverse_postorder(&graph);
+            let program = shader_builder.traverse(&graph).unwrap();
             renderer.set_preview_program(program);
 
             graph.clean();

@@ -109,7 +109,7 @@ impl Renderer {
         }";
 
         // Compile the shader program.
-        let program = Program::new(VS_SRC.to_string(), FS_SRC.to_string());
+        let program = Program::new(VS_SRC.to_string(), FS_SRC.to_string()).unwrap();
 
         // Setup buffers.
         let mut vao = 0;

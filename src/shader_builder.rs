@@ -15,7 +15,10 @@ impl ShaderBuilder {
         }
     }
 
-    pub fn traverse_postorder(&mut self, graph: &Graph) -> Program {
+    /// Performs a post-order traversal of the ops in `graph`,
+    /// returning the shader program that is described by the
+    /// current network.
+    pub fn traverse(&mut self, graph: &Graph) -> Option<Program> {
         let mut uuids = Vec::new();
 
         // Is there an active render node in this graph?
@@ -44,7 +47,11 @@ impl ShaderBuilder {
         uuids.push(root.id);
     }
 
+    /// Given a list of op UUIDs in the proper post-order, builds
+    /// and returns the appropriate shader code.
     fn build_sources(&mut self, graph: &Graph, uuids: Vec<Uuid>) -> (String, String) {
+
+        // TODO: each op will need something like this as part of its shader code
         static TRANSFORMS: &str = "
         struct transform
         {
@@ -210,12 +217,15 @@ impl ShaderBuilder {
                 // tab and trailing newline.
                 let mut formatted = match op.op_type {
 
-                    OpType::Sphere | OpType::Box => op.op_type.get_formatted(vec![op.name.clone()]),
+                    OpType::Sphere | OpType::Box | OpType::Plane => {
+                        op.op_type.get_formatted(vec![
+                            op.name.clone()
+                        ])
+                    },
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
                         let uuid_a = op.input_uuids[0];
                         let uuid_b = op.input_uuids[1];
-
                         op.op_type.get_formatted(vec![
                             op.name.clone(),                                 // This op's name
                             graph.get_op(uuid_a).unwrap().name.clone(), // The name of this op's 1st input
@@ -226,7 +236,6 @@ impl ShaderBuilder {
                     OpType::Render => {
                         let uuid = op.input_uuids[0];
                         let name = graph.get_op(uuid).unwrap().name.clone();
-
                         let mut code = op.op_type.get_formatted(vec![
                             op.name.clone(),    // This op's name
                             name                // The input op's name

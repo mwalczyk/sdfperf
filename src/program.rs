@@ -21,7 +21,7 @@ pub struct Program {
 
 impl Program {
 
-    fn compile_shader(src: &String, ty: GLenum) -> GLuint {
+    fn compile_shader(src: &String, ty: GLenum) -> Result<GLuint, String> {
         let shader;
 
         unsafe {
@@ -44,14 +44,16 @@ impl Program {
                 buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
 
                 gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
-                panic!("{}", str::from_utf8(&buf).ok().expect("ShaderInfoLog not valid utf8"));
+
+                let error = String::from_utf8(buf).ok().expect("ShaderInfoLog not valid utf8");
+                return Err(error);
             }
         }
 
-        shader
+        Ok(shader)
     }
 
-    fn link_program(vs: GLuint, fs: GLuint) -> GLuint {
+    fn link_program(vs: GLuint, fs: GLuint) -> Result<GLuint, String> {
         unsafe {
             let program = gl::CreateProgram();
             gl::AttachShader(program, vs);
@@ -72,13 +74,15 @@ impl Program {
                 buf.set_len((len as usize) - 1);
 
                 gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar, );
-                panic!("{}", str::from_utf8(&buf).ok().expect("ProgramInfoLog not valid utf8"));
 
                 gl::DeleteShader(fs);
                 gl::DeleteShader(vs);
+
+                let error = String::from_utf8(buf).ok().expect("ProgramInfoLog not valid utf8");
+                return Err(error);
             }
 
-            program
+            Ok(program)
         }
     }
 
@@ -86,16 +90,21 @@ impl Program {
 
     }
 
-    pub fn new(vert_shader_src: String, frag_shader_src: String) -> Program {
-        let vert_shader_id = Program::compile_shader(&vert_shader_src, gl::VERTEX_SHADER);
-        let frag_shader_id = Program::compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER);
-        let program_id = Program::link_program(vert_shader_id, frag_shader_id);
+    pub fn new(vert_shader_src: String, frag_shader_src: String) -> Option<Program> {
 
-        Program {
-            program_id,
-            vert_shader_src,
-            frag_shader_src
+        if let (Ok(vs_id), Ok(fs_id)) = (Program::compile_shader(&vert_shader_src, gl::VERTEX_SHADER),
+                                         Program::compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER)) {
+
+            let program_id = Program::link_program(vs_id, fs_id).ok().unwrap();
+
+            return Some(Program {
+                program_id,
+                vert_shader_src,
+                frag_shader_src
+            });
         }
+
+        None
     }
 
     pub fn bind(&self) {
