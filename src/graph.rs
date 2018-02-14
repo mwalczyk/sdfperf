@@ -29,7 +29,7 @@ pub struct Graph {
     pub ops: Vec<Op>,
 
     /// An adjacency list of connections between nodes
-    pub connections: HashSet<(OpIndex, OpIndex)>,
+    pub connections: Vec<(OpIndex, OpIndex)>,
 
     /// The index of the currently selected op (if there is one)
     pub selection: Option<OpIndex>,
@@ -70,7 +70,7 @@ impl Graph {
     pub fn new() -> Graph {
         Graph {
             ops: Vec::new(),
-            connections: HashSet::new(),
+            connections: Vec::new(),
             selection: None,
             root: None,
             dirty: false
@@ -90,30 +90,60 @@ impl Graph {
 
     pub fn delete_selected(&mut self) {
         if let Some(selected) = self.selection {
-
             println!("Connections before: {:?}", self.connections);
+
+            for op in self.ops.iter() {
+                print!("[Op with ID: {:?}], ", op.index);
+            }
+            println!();
 
             // Only retain connections that did not lead to/from the
             // removed op.
-            self.connections.retain(|&(src, dst)| {
+            let connections = self.connections.clone();
+            let (keep, delete): (Vec<_>, Vec<_>) = connections.into_iter().partition(|&(src, dst)| {
                 src != selected && dst != selected
             });
 
-            // Remove the op.
-            let selected_op = self.ops.swap_remove(selected.0);
+            for &(src, dst) in delete.iter() {
+                //println!("Deleting: {:?}, {:?}", src, dst);
+               // self.ops[0].output_indices.remove_item(src);
+            }
 
-            println!("Connections after: {:?}", self.connections);
+            self.connections = keep;
+//            self.connections.retain(|&(src, dst)| {
+//                src != selected && dst != selected
+//            });
+
+            // The current index of the op that will be swapped.
+            let swapped_index = OpIndex::from(self.ops.len() - 1);
+            // The current index of the op that will be removed.
+            let removed_index = self.ops.swap_remove(selected.0).index;
+
+            // Update the index of the op that was swapped into the old
+            // op's location in the memory arena.
+            self.ops[selected.0].index = removed_index;
+
+            // If any of the existing connections pointed to or
+            // from the op that was swapped, redirect them to
+            // that op's new index in the list.
+            for &mut (ref mut src, ref mut dst) in self.connections.iter_mut() {
+                if *dst == swapped_index {
+                    *dst = removed_index;
+                }
+                if *src == swapped_index {
+                    *src = removed_index;
+                }
+            }
 
             // Reset the selection.
             self.selection = None;
 
-            // Update the index of the op that was swapped into the old
-            // op's location in the memory arena.
-            self.ops[selected.0].index = selected;
+            println!("Connections after: {:?}", self.connections);
 
-            // Rebuild the connections involving the last_op
-
-            // Remove all connections that led to the removed op.
+            for op in self.ops.iter() {
+                print!("[Op with ID: {:?}], ", op.index);
+            }
+            println!();
          }
     }
 
@@ -237,13 +267,11 @@ impl Graph {
                 dst_op.state = InteractionState::Deselected;
 
                 // Add the new connection.
-                self.connections.insert((src, dst));
+                self.connections.push((src, dst));
             }
         } else {
             println!("Attempting to connect two ops with the same index - something is wrong here")
         }
-
-        println!("Connections after: {:?}", self.connections);
     }
 
     pub fn handle_interaction(&mut self, mouse_info: &MouseInfo) {
@@ -343,8 +371,10 @@ impl Graph {
                     op.state = InteractionState::ConnectDestination;
                     dst = OpIndex::from(index);
 
-                    // Only add the connection if the destination op actually accepts inputs
-                    if op.op_type.has_inputs() {
+                    // Only add the connection if:
+                    // 1) The destination op actually accepts inputs
+                    // 2) The connection doesn't already exist
+                    if op.op_type.has_inputs() && !self.connections.contains(&(src, dst)) {
                         found_new_connection = true;
                     }
                 }
