@@ -1,4 +1,4 @@
-use graph::Graph;
+use graph::{Graph, Edge, Direction};
 use operator::{Op, OpType, OpIndex};
 use program::Program;
 use uuid::Uuid;
@@ -37,11 +37,15 @@ impl ShaderBuilder {
     /// Examine a `root` op's inputs and recurse backwards until
     /// reaching a leaf node (i.e. an op with no other inputs).
     fn recurse(&self, graph: &Graph, root: OpIndex, indices: &mut Vec<OpIndex>, visited: &mut Vec<OpIndex>) {
-        for src in graph.connections[root.0].iter() {
-            if !visited.contains(src) {
-                visited.push(*src);
-                self.recurse(graph, *src, indices, visited);
+        for edge in graph.edges[root.0].iter() {
+            if let Direction::Backward = edge.d {
+                self.recurse(graph, edge.i, indices, visited);
             }
+
+//            if !visited.contains(src) {
+//                visited.push(*src);
+//                self.recurse(graph, *src, indices, visited);
+//            }
         }
 
         // Finally, push back the root op's index.
@@ -225,8 +229,8 @@ impl ShaderBuilder {
                     },
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
-                        let src_a = graph.connections[index.0][0];
-                        let src_b = graph.connections[index.0][1];
+                        let src_a = graph.edges[index.0][0].i;
+                        let src_b = graph.edges[index.0][1].i;
                         op.op_type.get_formatted(vec![
                             op.name.clone(),                                 // This op's name
                             graph.get_op(src_a).unwrap().name.clone(), // The name of this op's 1st input
@@ -235,7 +239,7 @@ impl ShaderBuilder {
                     }
 
                     OpType::Render => {
-                        let src = graph.connections[index.0][0];
+                        let src = graph.edges[index.0][0].i;
                         let name = graph.get_op(src).unwrap().name.clone();
                         let mut code = op.op_type.get_formatted(vec![
                             op.name.clone(),                                // This op's name

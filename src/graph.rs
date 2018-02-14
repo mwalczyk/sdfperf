@@ -6,7 +6,6 @@ use operator::{Op, OpType, OpIndex, MouseInfo, InteractionState};
 use renderer::Renderer;
 
 use std::cmp::max;
-use std::collections::HashSet;
 
 /// Palette:
 ///
@@ -24,22 +23,29 @@ pub enum OpPair<'a> {
     None,
 }
 
+struct Vertex<T> {
+    index: usize,
+    data: T
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Direction {
     Forward,
     Backward
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Edge {
-    i: OpIndex,
-    d: Direction
+    pub i: OpIndex,
+    pub d: Direction
 }
 
 pub struct Graph {
     /// A memory arena that contains all of the ops
     pub ops: Vec<Op>,
 
-    /// An adjacency list of connections between nodes
-    pub connections: Vec<Vec<OpIndex>>,
+    /// An adjacency list of edges between nodes
+    pub edges: Vec<Vec<Edge>>,
 
     /// The index of the currently selected op (if there is one)
     pub selection: Option<OpIndex>,
@@ -80,7 +86,7 @@ impl Graph {
     pub fn new() -> Graph {
         Graph {
             ops: Vec::new(),
-            connections: Vec::new(),
+            edges: Vec::new(),
             selection: None,
             root: None,
             dirty: false
@@ -162,7 +168,7 @@ impl Graph {
     pub fn add_op(&mut self, op_type: OpType, position: Vector2<f32>, size: Vector2<f32>) {
         let index = OpIndex(self.ops.len());
         self.ops.push(Op::new(index, op_type,position, size));
-        self.connections.push(Vec::new());
+        self.edges.push(Vec::new());
     }
 
     /// Pick a draw color based on the current interaction state of this
@@ -211,28 +217,31 @@ impl Graph {
         }
     }
 
-    /// Draws all connections between ops in the network.
-    fn draw_all_connections(&self, renderer: &Renderer) {
+    /// Draws all edges between ops in the network.
+    fn draw_all_edges(&self, renderer: &Renderer) {
         let mut points = Vec::new();
 
-        for (src, edges) in self.connections.iter().enumerate() {
-            for dst in edges.iter() {
-                if let (Some(src_op), Some(dst_op)) = (self.get_op(OpIndex::from(src)), self.get_op(*dst)) {
-                    let src_centroid = src_op.aabb_slot_output.centroid();
-                    let dst_centroid = dst_op.aabb_slot_input.centroid();
+        for (src, edges) in self.edges.iter().enumerate() {
+            for edge in edges.iter() {
+                if let Direction::Forward = edge.d {
+                    if let (Some(src_op), Some(dst_op)) = (self.get_op(OpIndex::from(src)), self.get_op(edge.i)) {
+                        let src_centroid = src_op.aabb_slot_output.centroid();
+                        let dst_centroid = dst_op.aabb_slot_input.centroid();
 
-                    // Push back the first point.
-                    points.push(src_centroid.x);
-                    points.push(src_centroid.y);
-                    points.push(0.0);
-                    points.push(0.0);
+                        // Push back the first point.
+                        points.push(src_centroid.x);
+                        points.push(src_centroid.y);
+                        points.push(0.0);
+                        points.push(0.0);
 
-                    // Push back the second point.
-                    points.push(dst_centroid.x);
-                    points.push(dst_centroid.y);
-                    points.push(1.0);
-                    points.push(1.0);
+                        // Push back the second point.
+                        points.push(dst_centroid.x);
+                        points.push(dst_centroid.y);
+                        points.push(1.0);
+                        points.push(1.0);
+                    }
                 }
+
             }
         }
         let draw_color = Color::white();
@@ -240,21 +249,21 @@ impl Graph {
         renderer.draw_line(&points, &draw_color);
     }
 
-    /// Draws all of the operators and connections that make
+    /// Draws all of the operators and edges that make
     /// up this graph.
     pub fn draw(&mut self, renderer: &Renderer) {
-        self.draw_all_connections(renderer);
+        self.draw_all_edges(renderer);
         self.draw_all_ops(renderer);
     }
 
     /// Returns an immutable reference to the op with the given
-    /// UUID, if it exists in the graph.
+    /// index, if it exists in the graph.
     pub fn get_op(&self, index: OpIndex) -> Option<&Op> {
         self.ops.get(index.0)
     }
 
     /// Returns an mutable reference to the op with the given
-    /// UUID, if it exists in the graph.
+    /// index, if it exists in the graph.
     pub fn get_op_mut(&mut self, index: OpIndex) -> Option<&mut Op> {
         self.ops.get_mut(index.0)
     }
@@ -262,8 +271,8 @@ impl Graph {
     /// Adds a new connection between two ops with UUIDs
     /// `a` and `b`, respectively.
     pub fn add_connection(&mut self, src: OpIndex, dst: OpIndex) {
-        self.connections[src.0].push(dst);
-        self.connections[dst.0].push(src);
+        self.edges[src.0].push(Edge { i: dst, d: Direction::Forward });
+        self.edges[dst.0].push(Edge { i: src, d: Direction::Backward });
 
         if let Pair::Both(src_op, dst_op) = index_twice(&mut self.ops, src.0, dst.0) {
 
@@ -384,7 +393,7 @@ impl Graph {
                     // Only add the connection if:
                     // 1) The destination op actually accepts inputs
                     // 2) The connection doesn't already exist
-                    if op.op_type.has_inputs() && !self.connections[src.0].contains(&dst) {
+                    if op.op_type.has_inputs() && !self.edges[src.0].contains(&Edge{ i: dst, d: Direction::Forward }) {
                         found_new_connection = true;
                     }
                 }
