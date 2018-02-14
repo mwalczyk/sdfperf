@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Copy, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct OpIndex(pub usize);
 
 impl From<usize> for OpIndex {

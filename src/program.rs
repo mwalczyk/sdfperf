@@ -27,12 +27,12 @@ impl Program {
         unsafe {
             shader = gl::CreateShader(ty);
 
-            // Attempt to compile the shader
+            // Attempt to compile the shader.
             let c_str = CString::new(src.as_bytes()).unwrap();
             gl::ShaderSource(shader, 1, &c_str.as_ptr(), ptr::null());
             gl::CompileShader(shader);
 
-            // Get the compile status
+            // Get the compile status.
             let mut status = gl::FALSE as GLint;
             gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut status);
 
@@ -40,12 +40,14 @@ impl Program {
             if status != (gl::TRUE as GLint) {
                 let mut len = 0;
                 gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
-                let mut buf = Vec::with_capacity(len as usize);
-                buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
+                let mut buffer = Vec::with_capacity(len as usize);
 
-                gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
+                // Subtract 1 to skip the trailing null character.
+                buffer.set_len((len as usize) - 1);
 
-                let error = String::from_utf8(buf).ok().expect("ShaderInfoLog not valid utf8");
+                gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buffer.as_mut_ptr() as *mut GLchar);
+
+                let error = String::from_utf8(buffer).ok().expect("ShaderInfoLog not valid utf8");
                 return Err(error);
             }
         }
@@ -60,25 +62,24 @@ impl Program {
             gl::AttachShader(program, fs);
             gl::LinkProgram(program);
 
-            // Get the link status
+            // Get the link status.
             let mut status = gl::FALSE as GLint;
             gl::GetProgramiv(program, gl::LINK_STATUS, &mut status);
 
-            // Fail on error
+            // If there was an error, return the error string.
             if status != (gl::TRUE as GLint) {
                 let mut len: GLint = 0;
                 gl::GetProgramiv(program, gl::INFO_LOG_LENGTH, &mut len);
-                let mut buf = Vec::with_capacity(len as usize);
+                let mut buffer = Vec::with_capacity(len as usize);
 
-                // Subtract 1 to skip the trailing null character
-                buf.set_len((len as usize) - 1);
+                // Subtract 1 to skip the trailing null character.
+                buffer.set_len((len as usize) - 1);
 
-                gl::GetProgramInfoLog(program, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar, );
-
+                gl::GetProgramInfoLog(program, len, ptr::null_mut(), buffer.as_mut_ptr() as *mut GLchar);
                 gl::DeleteShader(fs);
                 gl::DeleteShader(vs);
 
-                let error = String::from_utf8(buf).ok().expect("ProgramInfoLog not valid utf8");
+                let error = String::from_utf8(buffer).ok().expect("ProgramInfoLog not valid utf8");
                 return Err(error);
             }
 
@@ -91,19 +92,22 @@ impl Program {
     }
 
     pub fn new(vert_shader_src: String, frag_shader_src: String) -> Option<Program> {
-
+        // Make sure that compiling each of the shaders was successful.
         if let (Ok(vs_id), Ok(fs_id)) = (Program::compile_shader(&vert_shader_src, gl::VERTEX_SHADER),
                                          Program::compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER)) {
 
-            let program_id = Program::link_program(vs_id, fs_id).ok().unwrap();
-
-            return Some(Program {
-                program_id,
-                vert_shader_src,
-                frag_shader_src
-            });
+            // Make sure that linking the shader program was successful.
+            if let Ok(program_id) = Program::link_program(vs_id, fs_id) {
+                // If everything went ok, return the shader program.
+                return Some(Program {
+                    program_id,
+                    vert_shader_src,
+                    frag_shader_src
+                });
+            }
         }
 
+        // Otherwise, something failed: return `None`.
         None
     }
 

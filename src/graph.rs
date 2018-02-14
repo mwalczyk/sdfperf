@@ -5,6 +5,7 @@ use color::Color;
 use operator::{Op, OpType, OpIndex, MouseInfo, InteractionState};
 use renderer::Renderer;
 
+use std::cmp::max;
 use std::collections::HashSet;
 
 /// Palette:
@@ -17,6 +18,12 @@ use std::collections::HashSet;
 /// Selection:   0x76B264 (green)
 /// Other:       0xFEC56D (yellow)
 ///
+pub enum OpPair<'a> {
+    Both(&'a mut Op, &'a mut Op),
+    One(&'a mut Op),
+    None,
+}
+
 pub struct Graph {
     /// A memory arena that contains all of the ops
     pub ops: Vec<Op>,
@@ -24,10 +31,10 @@ pub struct Graph {
     /// An adjacency list of connections between nodes
     pub connections: HashSet<(OpIndex, OpIndex)>,
 
-    /// The UUID of the currently selected op (if there is one)
+    /// The index of the currently selected op (if there is one)
     pub selection: Option<OpIndex>,
 
-    /// The UUID of the root op (if there is one)
+    /// The index of the root op (if there is one)
     pub root: Option<OpIndex>,
 
     /// A flag that control whether or not the shader graph
@@ -35,19 +42,39 @@ pub struct Graph {
     dirty: bool
 }
 
+enum Pair<T> {
+    Both(T, T),
+    One(T),
+    None,
+}
+
+/// Get mutable references at index `a` and `b`.
+/// See: https://stackoverflow.com/questions/30073684/how-to-get-mutable-references-to-two-array-elements-at-the-same-time
+fn index_twice<T>(slc: &mut [T], a: usize, b: usize) -> Pair<&mut T> {
+    if max(a, b) >= slc.len() {
+        Pair::None
+    } else if a == b {
+        Pair::One(&mut slc[max(a, b)])
+    } else {
+        unsafe {
+            let ar = &mut *(slc.get_unchecked_mut(a) as *mut _);
+            let br = &mut *(slc.get_unchecked_mut(b) as *mut _);
+            Pair::Both(ar, br)
+        }
+    }
+}
+
 impl Graph {
 
     /// Constructs a new, empty graph.
     pub fn new() -> Graph {
-        let graph = Graph {
+        Graph {
             ops: Vec::new(),
             connections: HashSet::new(),
             selection: None,
             root: None,
             dirty: false
-        };
-
-        graph
+        }
     }
 
     /// Returns `true` if the shader graph needs to be rebuilt and
@@ -62,26 +89,32 @@ impl Graph {
     }
 
     pub fn delete_selected(&mut self) {
-//        // Is there an op currently selected?
-//        if let Some(selected_uuid) = self.selection {
-//
-//            let mut remove_index = None;
-//            for (index, op) in self.ops.iter().enumerate() {
-//                if op.id == selected_uuid {
-//                    remove_index = Some(index);
-//                    break;
-//                }
-//            }
-//
-//            if let Some(index) = remove_index {
-//                self.ops.remove(index);
-//
-//                for &(uuid_a, uuid_b) in &self.connections {
-//
-//                }
-//            }
-//
-//        }
+        if let Some(selected) = self.selection {
+
+            println!("Connections before: {:?}", self.connections);
+
+            // Only retain connections that did not lead to/from the
+            // removed op.
+            self.connections.retain(|&(src, dst)| {
+                src != selected && dst != selected
+            });
+
+            // Remove the op.
+            let selected_op = self.ops.swap_remove(selected.0);
+
+            println!("Connections after: {:?}", self.connections);
+
+            // Reset the selection.
+            self.selection = None;
+
+            // Update the index of the op that was swapped into the old
+            // op's location in the memory arena.
+            self.ops[selected.0].index = selected;
+
+            // Rebuild the connections involving the last_op
+
+            // Remove all connections that led to the removed op.
+         }
     }
 
     /// Adds a new op of type `op_type` to the network at coordinates
@@ -140,25 +173,25 @@ impl Graph {
     /// Draws all connections between ops in the network.
     fn draw_all_connections(&self, renderer: &Renderer) {
         let mut points = Vec::new();
-        for &(uuid_a, uuid_b) in &self.connections {
-            let op_a = self.get_op(uuid_a).unwrap();
-            let op_b = self.get_op(uuid_b).unwrap();
-            let centroid_a = op_a.aabb_slot_output.centroid();
-            let centroid_b = op_b.aabb_slot_input.centroid();
 
-            // Push back the first point.
-            points.push(centroid_a.x);
-            points.push(centroid_a.y);
-            points.push(0.0);
-            points.push(0.0);
+        for &(src, dst) in &self.connections {
+            if let (Some(src_op), Some(dst_op)) = (self.get_op(src), self.get_op(dst)) {
+                let src_centroid = src_op.aabb_slot_output.centroid();
+                let dst_centroid = dst_op.aabb_slot_input.centroid();
 
-            // Push back the second point.
-            points.push(centroid_b.x);
-            points.push(centroid_b.y);
-            points.push(1.0);
-            points.push(1.0);
+                // Push back the first point.
+                points.push(src_centroid.x);
+                points.push(src_centroid.y);
+                points.push(0.0);
+                points.push(0.0);
+
+                // Push back the second point.
+                points.push(dst_centroid.x);
+                points.push(dst_centroid.y);
+                points.push(1.0);
+                points.push(1.0);
+            }
         }
-
         let draw_color = Color::white();
 
         renderer.draw_line(&points, &draw_color);
@@ -186,18 +219,8 @@ impl Graph {
     /// Adds a new connection between two ops with UUIDs
     /// `a` and `b`, respectively.
     pub fn add_connection(&mut self, src: OpIndex, dst: OpIndex) {
-        // First, find the two ops with matching indices.
-        let mut src_op: Option<&mut Op> = None;
-        let mut dst_op: Option<&mut Op> = None;
-        for op in self.ops.iter_mut() {
-            if op.index == src {
-                src_op = Some(op);
-            } else if op.index == dst {
-                dst_op = Some(op);
-            }
-        }
+        if let Pair::Both(src_op, dst_op) = index_twice(&mut self.ops, src.0, dst.0) {
 
-        if let (Some(src_op), Some(dst_op)) = (src_op, dst_op) {
             // Here, we only proceed if the connection was successful.
             if src_op.connect_to(dst_op) {
 
@@ -217,8 +240,10 @@ impl Graph {
                 self.connections.insert((src, dst));
             }
         } else {
-            println!("Attempting to connect two ops with non-existent UUIDs - something is wrong here")
+            println!("Attempting to connect two ops with the same index - something is wrong here")
         }
+
+        println!("Connections after: {:?}", self.connections);
     }
 
     pub fn handle_interaction(&mut self, mouse_info: &MouseInfo) {
@@ -318,10 +343,8 @@ impl Graph {
                     op.state = InteractionState::ConnectDestination;
                     dst = OpIndex::from(index);
 
-                    // Only add the connection if:
-                    // 1) It doesn't already exist in the hash set
-                    // 2) The destination op actually accepts inputs
-                    if !self.connections.contains(&(src, dst)) && op.op_type.has_inputs() {
+                    // Only add the connection if the destination op actually accepts inputs
+                    if op.op_type.has_inputs() {
                         found_new_connection = true;
                     }
                 }

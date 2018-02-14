@@ -251,8 +251,9 @@ impl ShaderBuilder {
 
                     _ => "// empty".to_string()
                 };
-                println!("{}", formatted);
 
+                // Add a tab indent before each new line of shader code and a newline
+                // character after.
                 self.shader_code.push('\t');
                 self.shader_code.push_str(&formatted[..]);
                 self.shader_code.push('\n');
