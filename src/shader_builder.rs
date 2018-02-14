@@ -20,13 +20,13 @@ impl ShaderBuilder {
     /// current network.
     pub fn traverse(&mut self, graph: &Graph) -> Option<Program> {
         let mut indices = Vec::new();
+        let mut visited = Vec::new();
 
         // Is there an active render node in this graph?
         if let Some(root) = graph.root {
-            let root_op = graph.get_op(root).unwrap();
-
-            // Traverse the graph, starting at the root op.
-            self.recurse(graph, root_op, &mut indices);
+            // Traverse the graph, starting at the root op's index.
+            visited.push(root);
+            self.recurse(graph, root, &mut indices, &mut visited);
         }
 
         let (vs_src, fs_src) = self.build_sources(graph, indices);
@@ -36,15 +36,16 @@ impl ShaderBuilder {
 
     /// Examine a `root` op's inputs and recurse backwards until
     /// reaching a leaf node (i.e. an op with no other inputs).
-    fn recurse(&self, graph: &Graph, root: &Op, indices: &mut Vec<OpIndex>) {
-        if root.op_type.has_inputs() {
-            for index in &root.input_indices {
-                self.recurse(graph, graph.get_op(*index).unwrap(), indices);
+    fn recurse(&self, graph: &Graph, root: OpIndex, indices: &mut Vec<OpIndex>, visited: &mut Vec<OpIndex>) {
+        for src in graph.connections[root.0].iter() {
+            if !visited.contains(src) {
+                visited.push(*src);
+                self.recurse(graph, *src, indices, visited);
             }
         }
 
         // Finally, push back the root op's index.
-        indices.push(root.index);
+        indices.push(root);
     }
 
     /// Given a list of op indices in the proper post-order, builds
@@ -224,8 +225,8 @@ impl ShaderBuilder {
                     },
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
-                        let src_a = op.input_indices[0];
-                        let src_b = op.input_indices[1];
+                        let src_a = graph.connections[index.0][0];
+                        let src_b = graph.connections[index.0][1];
                         op.op_type.get_formatted(vec![
                             op.name.clone(),                                 // This op's name
                             graph.get_op(src_a).unwrap().name.clone(), // The name of this op's 1st input
@@ -234,7 +235,7 @@ impl ShaderBuilder {
                     }
 
                     OpType::Render => {
-                        let src = op.input_indices[0];
+                        let src = graph.connections[index.0][0];
                         let name = graph.get_op(src).unwrap().name.clone();
                         let mut code = op.op_type.get_formatted(vec![
                             op.name.clone(),                                // This op's name

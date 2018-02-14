@@ -24,12 +24,22 @@ pub enum OpPair<'a> {
     None,
 }
 
+pub enum Direction {
+    Forward,
+    Backward
+}
+
+pub struct Edge {
+    i: OpIndex,
+    d: Direction
+}
+
 pub struct Graph {
     /// A memory arena that contains all of the ops
     pub ops: Vec<Op>,
 
     /// An adjacency list of connections between nodes
-    pub connections: Vec<(OpIndex, OpIndex)>,
+    pub connections: Vec<Vec<OpIndex>>,
 
     /// The index of the currently selected op (if there is one)
     pub selection: Option<OpIndex>,
@@ -90,61 +100,61 @@ impl Graph {
 
     pub fn delete_selected(&mut self) {
         if let Some(selected) = self.selection {
-            println!("Connections before: {:?}", self.connections);
-
-            for op in self.ops.iter() {
-                print!("[Op with ID: {:?}], ", op.index);
-            }
-            println!();
-
-            // Only retain connections that did not lead to/from the
-            // removed op.
-            let connections = self.connections.clone();
-            let (keep, delete): (Vec<_>, Vec<_>) = connections.into_iter().partition(|&(src, dst)| {
-                src != selected && dst != selected
-            });
-
-            for &(src, dst) in delete.iter() {
-                //println!("Deleting: {:?}, {:?}", src, dst);
-               // self.ops[0].output_indices.remove_item(src);
-            }
-
-            self.connections = keep;
-//            self.connections.retain(|&(src, dst)| {
+//            println!("Connections before: {:?}", self.connections);
+//
+//            for op in self.ops.iter() {
+//                print!("[Op with ID: {:?}], ", op.index);
+//            }
+//            println!();
+//
+//            // Only retain connections that did not lead to/from the
+//            // removed op.
+//            let connections = self.connections.clone();
+//            let (keep, delete): (Vec<_>, Vec<_>) = connections.into_iter().partition(|&(src, dst)| {
 //                src != selected && dst != selected
 //            });
-
-            // The current index of the op that will be swapped.
-            let swapped_index = OpIndex::from(self.ops.len() - 1);
-            // The current index of the op that will be removed.
-            let removed_index = self.ops.swap_remove(selected.0).index;
-
-            // Update the index of the op that was swapped into the old
-            // op's location in the memory arena.
-            self.ops[selected.0].index = removed_index;
-
-            // If any of the existing connections pointed to or
-            // from the op that was swapped, redirect them to
-            // that op's new index in the list.
-            for &mut (ref mut src, ref mut dst) in self.connections.iter_mut() {
-                if *dst == swapped_index {
-                    *dst = removed_index;
-                }
-                if *src == swapped_index {
-                    *src = removed_index;
-                }
-            }
-
-            // Reset the selection.
-            self.selection = None;
-
-            println!("Connections after: {:?}", self.connections);
-
-            for op in self.ops.iter() {
-                print!("[Op with ID: {:?}], ", op.index);
-            }
-            println!();
-         }
+//
+//            for &(src, dst) in delete.iter() {
+//                //println!("Deleting: {:?}, {:?}", src, dst);
+//               // self.ops[0].output_indices.remove_item(src);
+//            }
+//
+//            self.connections = keep;
+////            self.connections.retain(|&(src, dst)| {
+////                src != selected && dst != selected
+////            });
+//
+//            // The current index of the op that will be swapped.
+//            let swapped_index = OpIndex::from(self.ops.len() - 1);
+//            // The current index of the op that will be removed.
+//            let removed_index = self.ops.swap_remove(selected.0).index;
+//
+//            // Update the index of the op that was swapped into the old
+//            // op's location in the memory arena.
+//            self.ops[selected.0].index = removed_index;
+//
+//            // If any of the existing connections pointed to or
+//            // from the op that was swapped, redirect them to
+//            // that op's new index in the list.
+//            for &mut (ref mut src, ref mut dst) in self.connections.iter_mut() {
+//                if *dst == swapped_index {
+//                    *dst = removed_index;
+//                }
+//                if *src == swapped_index {
+//                    *src = removed_index;
+//                }
+//            }
+//
+//            // Reset the selection.
+//            self.selection = None;
+//
+//            println!("Connections after: {:?}", self.connections);
+//
+//            for op in self.ops.iter() {
+//                print!("[Op with ID: {:?}], ", op.index);
+//            }
+//            println!();
+        }
     }
 
     /// Adds a new op of type `op_type` to the network at coordinates
@@ -152,6 +162,7 @@ impl Graph {
     pub fn add_op(&mut self, op_type: OpType, position: Vector2<f32>, size: Vector2<f32>) {
         let index = OpIndex(self.ops.len());
         self.ops.push(Op::new(index, op_type,position, size));
+        self.connections.push(Vec::new());
     }
 
     /// Pick a draw color based on the current interaction state of this
@@ -204,22 +215,24 @@ impl Graph {
     fn draw_all_connections(&self, renderer: &Renderer) {
         let mut points = Vec::new();
 
-        for &(src, dst) in &self.connections {
-            if let (Some(src_op), Some(dst_op)) = (self.get_op(src), self.get_op(dst)) {
-                let src_centroid = src_op.aabb_slot_output.centroid();
-                let dst_centroid = dst_op.aabb_slot_input.centroid();
+        for (src, edges) in self.connections.iter().enumerate() {
+            for dst in edges.iter() {
+                if let (Some(src_op), Some(dst_op)) = (self.get_op(OpIndex::from(src)), self.get_op(*dst)) {
+                    let src_centroid = src_op.aabb_slot_output.centroid();
+                    let dst_centroid = dst_op.aabb_slot_input.centroid();
 
-                // Push back the first point.
-                points.push(src_centroid.x);
-                points.push(src_centroid.y);
-                points.push(0.0);
-                points.push(0.0);
+                    // Push back the first point.
+                    points.push(src_centroid.x);
+                    points.push(src_centroid.y);
+                    points.push(0.0);
+                    points.push(0.0);
 
-                // Push back the second point.
-                points.push(dst_centroid.x);
-                points.push(dst_centroid.y);
-                points.push(1.0);
-                points.push(1.0);
+                    // Push back the second point.
+                    points.push(dst_centroid.x);
+                    points.push(dst_centroid.y);
+                    points.push(1.0);
+                    points.push(1.0);
+                }
             }
         }
         let draw_color = Color::white();
@@ -249,26 +262,23 @@ impl Graph {
     /// Adds a new connection between two ops with UUIDs
     /// `a` and `b`, respectively.
     pub fn add_connection(&mut self, src: OpIndex, dst: OpIndex) {
+        self.connections[src.0].push(dst);
+        self.connections[dst.0].push(src);
+
         if let Pair::Both(src_op, dst_op) = index_twice(&mut self.ops, src.0, dst.0) {
 
-            // Here, we only proceed if the connection was successful.
-            if src_op.connect_to(dst_op) {
-
-                // If we are connecting to a render op, then the shader
-                // must be rebuilt.
-                if dst_op.op_type == OpType::Render {
-                    self.root = Some(dst_op.index);
-                    self.dirty = true;
-                    println!("Connected to render node: building graph");
-                }
-
-                // Deselect both ops.
-                src_op.state = InteractionState::Deselected;
-                dst_op.state = InteractionState::Deselected;
-
-                // Add the new connection.
-                self.connections.push((src, dst));
+            // If we are connecting to a render op, then the shader
+            // must be rebuilt.
+            if dst_op.op_type == OpType::Render {
+                self.root = Some(dst_op.index);
+                self.dirty = true;
+                println!("Connected to render node: building graph");
             }
+
+            // Deselect both ops.
+            src_op.state = InteractionState::Deselected;
+            dst_op.state = InteractionState::Deselected;
+
         } else {
             println!("Attempting to connect two ops with the same index - something is wrong here")
         }
@@ -374,7 +384,7 @@ impl Graph {
                     // Only add the connection if:
                     // 1) The destination op actually accepts inputs
                     // 2) The connection doesn't already exist
-                    if op.op_type.has_inputs() && !self.connections.contains(&(src, dst)) {
+                    if op.op_type.has_inputs() && !self.connections[src.0].contains(&dst) {
                         found_new_connection = true;
                     }
                 }

@@ -161,11 +161,8 @@ pub struct Op {
     /// The index of this op in the memory arena
     pub index: OpIndex,
 
-    /// The indices of all ops that are connected to this op
-    pub input_indices: Vec<OpIndex>,
-
-    /// The indices of all ops that this op connects to
-    pub output_indices: Vec<OpIndex>,
+    /// The number of ops that are currently connect to this op
+    pub active_inputs: usize,
 
     /// The bounding box of the op
     pub aabb_op: BoundingRect,
@@ -207,8 +204,7 @@ impl Op {
                                                             SLOT_SIZE);
         Op {
             index,
-            input_indices: Vec::new(),
-            output_indices: Vec::new(),
+            active_inputs: 0,
             aabb_op,
             aabb_slot_input,
             aabb_slot_output,
@@ -222,7 +218,7 @@ impl Op {
     /// Returns the number of ops that are connected to this
     /// op in the current graph
     fn get_number_of_active_inputs(&self) -> usize {
-        self.input_indices.len()
+        self.active_inputs
     }
 
     /// Connects this op to `other`. Returns `true` if the
@@ -235,9 +231,7 @@ impl Op {
         // Make sure that this op's output slot is active and the
         // other op's input slot isn't already at capacity.
         if self.op_type.has_outputs() && other.get_number_of_active_inputs() < other.op_type.get_input_capacity() {
-            self.output_indices.push(other.index);
-            other.input_indices.push(self.index);
-
+            self.active_inputs += 1;
             return true;
         }
         false
