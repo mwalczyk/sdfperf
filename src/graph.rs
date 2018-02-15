@@ -1,26 +1,5 @@
 use std::cmp::max;
 
-pub enum Pair<T> {
-    Both(T, T),
-    One(T),
-    None,
-}
-
-/// Get mutable references at index `a` and `b`.
-pub fn index_twice<T>(slc: &mut [T], a: usize, b: usize) -> Pair<&mut T> {
-    if max(a, b) >= slc.len() {
-        Pair::None
-    } else if a == b {
-        Pair::One(&mut slc[max(a, b)])
-    } else {
-        unsafe {
-            let ar = &mut *(slc.get_unchecked_mut(a) as *mut _);
-            let br = &mut *(slc.get_unchecked_mut(b) as *mut _);
-            Pair::Both(ar, br)
-        }
-    }
-}
-
 pub trait Connection {
     fn has_inputs(&self) -> bool { true }
     fn has_outputs(&self) -> bool { false }
@@ -108,6 +87,8 @@ impl<V, E> Graph<V, E> {
                 index != i
             });
 
+            // Update any edges that were pointing to or from the
+            // swapped vertex.
             for index in edges.inputs.iter_mut() {
                 if *index == swapped_index {
                     *index = i;

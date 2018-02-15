@@ -13,8 +13,8 @@ use std::ffi::CString;
 use std::time::{Duration, SystemTime};
 
 pub struct Renderer {
-    /// The shader program that will be used to render sprites
-    program: Program,
+    /// The shader program that will be used to draw sprites
+    draw_program: Program,
 
     /// The projection matrix used to render the network orthographically
     projection: Matrix4<f32>,
@@ -40,8 +40,11 @@ pub struct Renderer {
     /// The user-generated shader program that will be built dynamically
     preview_program: Option<Program>,
 
+    /// The program used if the `preview_program` is unassigned or invalid
+    fallback_program: Program,
+
     /// THe AABB of the SDF render view
-    preview: BoundingRect,
+    aabb_preview: BoundingRect,
 
     /// An application timer
     time: SystemTime
@@ -64,12 +67,11 @@ impl Renderer {
             0.0, 1.0,   0.0, 0.0  // LL
         ];
 
-        static VS_SRC: &'static str = "
+        static COMMON_VS_SRC: &'static str = "
         #version 430
 
         layout(location = 0) in vec2 position;
         layout(location = 1) in vec2 texcoord;
-
         layout (location = 0) out vec2 vs_texcoord;
 
         uniform mat4 u_model_matrix;
@@ -81,7 +83,7 @@ impl Renderer {
             gl_Position = u_projection_matrix * u_model_matrix * vec4(position, 0.0, 1.0);
         }";
 
-        static FS_SRC: &'static str = "
+        static DRAW_FS_SRC: &'static str = "
         #version 430
 
         uniform float u_time;
@@ -89,7 +91,6 @@ impl Renderer {
         uniform uint u_draw_mode = 0;
 
         layout (location = 0) in vec2 vs_texcoord;
-
         layout (location = 0) out vec4 o_color;
 
         void main() {
@@ -108,8 +109,26 @@ impl Renderer {
             o_color = vec4(u_draw_color.rgb, alpha);
         }";
 
+        static FALLBACK_FS_SRC: &'static str = "
+        #version 430
+
+        layout (location = 0) in vec2 vs_texcoord;
+        layout (location = 0) out vec4 o_color;
+
+        void main() {
+            const float tile = 10.0;
+            vec2 uv = vs_texcoord * tile;
+            vec2 ipos = floor(uv);
+
+            float total = dot(ipos, vec2(1.0));
+            float checkerboard = mod(total, 2.0);
+
+            o_color = vec4(vec3(checkerboard), 1.0);;
+        }";
+
         // Compile the shader program.
-        let program = Program::new(VS_SRC.to_string(), FS_SRC.to_string()).unwrap();
+        let draw_program = Program::new(COMMON_VS_SRC.to_string(), DRAW_FS_SRC.to_string()).unwrap();
+        let fallback_program = Program::new(COMMON_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
 
         // Setup buffers.
         let mut vao = 0;
@@ -131,8 +150,8 @@ impl Renderer {
             gl::NamedBufferStorage(vbo_line, vbo_line_size, ptr::null(), gl::DYNAMIC_STORAGE_BIT);
 
             // This is not strictly necessary, but we do it for completeness sake.
-            let pos_attr = gl::GetAttribLocation(program.program_id, CString::new("position").unwrap().as_ptr());
-            let tex_attr = gl::GetAttribLocation(program.program_id, CString::new("texcoord").unwrap().as_ptr());
+            let pos_attr = gl::GetAttribLocation(draw_program.program_id, CString::new("position").unwrap().as_ptr());
+            let tex_attr = gl::GetAttribLocation(draw_program.program_id, CString::new("texcoord").unwrap().as_ptr());
             let tex_offset = (2 * mem::size_of::<GLfloat>()) as GLuint;
 
             // Create the VAO and setup vertex attributes.
@@ -153,7 +172,7 @@ impl Renderer {
         }
 
         let mut renderer = Renderer {
-            program,
+            draw_program,
             projection: Matrix4::zero(),
             vao,
             vbo_rect,
@@ -161,7 +180,8 @@ impl Renderer {
             network_zoom: 1.0,
             network_resolution: Vector2::new(800.0, 600.0),
             preview_program: None,
-            preview: BoundingRect::new(Vector2::new(100.0, 000.0),Vector2::new(300.0, 300.0)),
+            fallback_program,
+            aabb_preview: BoundingRect::new(Vector2::new(100.0, 000.0),Vector2::new(300.0, 300.0)),
             time: SystemTime::now()
         };
 
@@ -198,45 +218,55 @@ impl Renderer {
     /// Sets the shader program that will be used to render a
     /// miniature preview window in the lower right-hand corner
     /// of the network.
-    pub fn set_preview_program(&mut self, program: Program) {
-        self.preview_program = Some(program);
+    ///
+    /// If `program` is `None`, then the renderer will use a
+    /// fall-back shader to indicate the error state of the
+    /// current graph.
+    pub fn set_preview_program(&mut self, program: Option<Program>) {
+        self.preview_program = program;
     }
 
     /// If a preview program has be assigned, render a miniature
     /// preview window in the lower right-hand corner of the
     /// network.
     pub fn draw_preview(&self) {
+        // First, set all relevant uniforms.
+        let model = self.aabb_preview.get_model_matrix();
+
         if let Some(ref program) = self.preview_program {
             program.bind();
-
-            // First, set all relevant uniforms.
-            let model = self.preview.get_model_matrix();
             program.uniform_matrix_4f("u_model_matrix", &model);
             program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-            program.uniform_1ui("u_draw_mode", 0);
-            program.uniform_1f("u_time", self.get_elapsed_seconds());
+        } else {
+            self.fallback_program.bind();
+            self.fallback_program.uniform_matrix_4f("u_model_matrix", &model);
+            self.fallback_program.uniform_matrix_4f("u_projection_matrix", &self.projection);
+        }
 
-            // Next, issue a draw call.
-            unsafe {
-                gl::BindVertexArray(self.vao);
-                gl::DrawArrays(gl::TRIANGLES, 0, 6);
-            }
+        // Next, issue a draw call.
+        unsafe {
+            gl::BindVertexArray(self.vao);
+            gl::DrawArrays(gl::TRIANGLES, 0, 6);
+        }
 
+        if let Some(ref program) = self.preview_program {
             program.unbind();
+        } else {
+            self.fallback_program.unbind();
         }
     }
 
     /// Draws the rectangle described by `rect`, with solid `color`.
     pub fn draw_rect(&self, rect: &BoundingRect, color: &Color) {
-        self.program.bind();
+        self.draw_program.bind();
 
         // First, set all relevant uniforms.
         let model = rect.get_model_matrix();
-        self.program.uniform_matrix_4f("u_model_matrix", &model);
-        self.program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        self.program.uniform_4f("u_draw_color", &(*color).into());
-        self.program.uniform_1ui("u_draw_mode", 0);
-        self.program.uniform_1f("u_time", self.get_elapsed_seconds());
+        self.draw_program.uniform_matrix_4f("u_model_matrix", &model);
+        self.draw_program.uniform_matrix_4f("u_projection_matrix", &self.projection);
+        self.draw_program.uniform_4f("u_draw_color", &(*color).into());
+        self.draw_program.uniform_1ui("u_draw_mode", 0);
+        self.draw_program.uniform_1f("u_time", self.get_elapsed_seconds());
 
         // Next, issue a draw call.
         unsafe {
@@ -246,20 +276,20 @@ impl Renderer {
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
         }
 
-        self.program.unbind();
+        self.draw_program.unbind();
     }
 
     /// Draws a series of line segments.
     pub fn draw_line(&self, data: &Vec<f32>, color: &Color) {
-        self.program.bind();
+        self.draw_program.bind();
 
         // First, set all relevant uniforms.
         let model = Matrix4::identity();
-        self.program.uniform_matrix_4f("u_model_matrix", &model);
-        self.program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        self.program.uniform_4f("u_draw_color", &(*color).into());
-        self.program.uniform_1ui("u_draw_mode", 1);
-        self.program.uniform_1f("u_time", self.get_elapsed_seconds());
+        self.draw_program.uniform_matrix_4f("u_model_matrix", &model);
+        self.draw_program.uniform_matrix_4f("u_projection_matrix", &self.projection);
+        self.draw_program.uniform_4f("u_draw_color", &(*color).into());
+        self.draw_program.uniform_1ui("u_draw_mode", 1);
+        self.draw_program.uniform_1f("u_time", self.get_elapsed_seconds());
 
         // Next, update buffer storage and issue a draw call.
         unsafe {
@@ -272,7 +302,7 @@ impl Renderer {
             gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);
         }
 
-        self.program.unbind();
+        self.draw_program.unbind();
     }
 
     fn get_elapsed_seconds(&self) -> f32 {

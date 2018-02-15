@@ -3,7 +3,8 @@ use uuid::Uuid;
 
 use color::Color;
 use graph::Graph;
-use operator::{Op, OpType, MouseInfo, InteractionState};
+use interaction::{MouseInfo, InteractionState};
+use operator::{Op, OpType};
 use renderer::Renderer;
 
 use std::cmp::max;

@@ -10,15 +10,18 @@ extern crate uuid;
 mod bounding_rect;
 mod color;
 mod graph;
+mod interaction;
 mod network;
 mod operator;
+mod preview;
 mod program;
 mod renderer;
 mod shader_builder;
 mod shader_string;
 
 use color::Color;
-use operator::{Op, OpType, MouseInfo};
+use interaction::MouseInfo;
+use operator::{Op, OpType};
 use network::Network;
 use program::Program;
 use renderer::Renderer;
@@ -150,7 +153,7 @@ fn main() {
         if network.dirty() {
             if let Some(root) = network.root {
                 let indices = network.graph.traverse(root);
-                let program = builder.build_sources(&network, indices).unwrap();
+                let program = builder.build_sources(&network, indices);
                 renderer.set_preview_program(program);
 
                 network.clean();

@@ -1,7 +1,10 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
 use bounding_rect::BoundingRect;
-use cgmath::Vector2;
+use interaction::InteractionState;
+
+use cgmath::{Vector2, Vector3};
 use uuid::Uuid;
+
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -115,25 +118,6 @@ impl OpType {
 
         //let indices: Vec<_> = self.get_unformatted_shader_code().match_indices("{}").collect();
     }
-}
-
-pub struct MouseInfo {
-    pub curr: Vector2<f32>,
-    pub last: Vector2<f32>,
-    pub clicked: Vector2<f32>,
-    pub down: bool
-}
-
-pub enum InteractionState {
-    Deselected,
-    Selected,
-    Hover,
-    ConnectSource,
-    ConnectDestination
-}
-
-trait InterfaceElement {
-    fn get_bounding_rect() -> BoundingRect;
 }
 
 pub struct Op {
