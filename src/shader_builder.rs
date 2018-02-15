@@ -1,6 +1,7 @@
-use graph::{Graph, Edge, Direction};
-use operator::{Op, OpType, OpIndex};
+use network::Network;
+use operator::{Op, OpType};
 use program::Program;
+
 use uuid::Uuid;
 
 pub struct ShaderBuilder {
@@ -15,46 +16,9 @@ impl ShaderBuilder {
         }
     }
 
-    /// Performs a post-order traversal of the ops in `graph`,
-    /// returning the shader program that is described by the
-    /// current network.
-    pub fn traverse(&mut self, graph: &Graph) -> Option<Program> {
-        let mut indices = Vec::new();
-        let mut visited = Vec::new();
-
-        // Is there an active render node in this graph?
-        if let Some(root) = graph.root {
-            // Traverse the graph, starting at the root op's index.
-            visited.push(root);
-            self.recurse(graph, root, &mut indices, &mut visited);
-        }
-
-        let (vs_src, fs_src) = self.build_sources(graph, indices);
-
-        Program::new(vs_src, fs_src)
-    }
-
-    /// Examine a `root` op's inputs and recurse backwards until
-    /// reaching a leaf node (i.e. an op with no other inputs).
-    fn recurse(&self, graph: &Graph, root: OpIndex, indices: &mut Vec<OpIndex>, visited: &mut Vec<OpIndex>) {
-        for edge in graph.edges[root.0].iter() {
-            if let Direction::Backward = edge.d {
-                self.recurse(graph, edge.i, indices, visited);
-            }
-
-//            if !visited.contains(src) {
-//                visited.push(*src);
-//                self.recurse(graph, *src, indices, visited);
-//            }
-        }
-
-        // Finally, push back the root op's index.
-        indices.push(root);
-    }
-
     /// Given a list of op indices in the proper post-order, builds
     /// and returns the appropriate shader code.
-    fn build_sources(&mut self, graph: &Graph, indices: Vec<OpIndex>) -> (String, String) {
+    pub fn build_sources(&mut self, network: &Network, indices: Vec<usize>) -> Option<Program> {
 
         // TODO: each op will need something like this as part of its shader code
         static TRANSFORMS: &str = "
@@ -216,40 +180,44 @@ impl ShaderBuilder {
             o_color = vec4(color, 1.0);
         }";
 
+        // Clear the cached shader code (if there was any).
+        self.shader_code = "".to_string();
+
+        // Build the `map` function by traversing the graph of ops.
         for index in indices {
-            if let Some(op) = graph.get_op(index) {
+            if let Some(vertex) = network.graph.get_vertex(index) {
                 // Append this op's line of shader code with a leading
                 // tab and trailing newline.
-                let mut formatted = match op.op_type {
+                let mut formatted = match vertex.data.family {
 
                     OpType::Sphere | OpType::Box | OpType::Plane => {
-                        op.op_type.get_formatted(vec![
-                            op.name.clone()
+                        vertex.data.family.get_formatted(vec![
+                            vertex.data.name.clone()
                         ])
                     },
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
-                        let src_a = graph.edges[index.0][0].i;
-                        let src_b = graph.edges[index.0][1].i;
-                        op.op_type.get_formatted(vec![
-                            op.name.clone(),                                 // This op's name
-                            graph.get_op(src_a).unwrap().name.clone(), // The name of this op's 1st input
-                            graph.get_op(src_b).unwrap().name.clone()  // The name of this op's 2nd input
+                        let src_a = network.graph.edges[index].inputs[0];
+                        let src_b = network.graph.edges[index].inputs[1];
+                        vertex.data.family.get_formatted(vec![
+                            vertex.data.name.clone(),                                        // This op's name
+                            network.graph.get_vertex(src_a).unwrap().data.name.clone(), // The name of this op's 1st input
+                            network.graph.get_vertex(src_b).unwrap().data.name.clone()  // The name of this op's 2nd input
                         ])
                     }
 
                     OpType::Render => {
-                        let src = graph.edges[index.0][0].i;
-                        let name = graph.get_op(src).unwrap().name.clone();
-                        let mut code = op.op_type.get_formatted(vec![
-                            op.name.clone(),                                // This op's name
-                            name                                            // The input op's name
+                        let src = network.graph.edges[index].inputs[0];
+                        let name = network.graph.get_vertex(src).unwrap().data.name.clone();
+                        let mut code = vertex.data.family.get_formatted(vec![
+                            vertex.data.name.clone(),                                // This op's name
+                            name                                                     // The input op's name
                         ]);
 
                         // Add the final `return` in the `map(..)` function.
                         code.push('\n');
                         code.push('\t');
-                        code.push_str(&format!("return vec2(0.0, {});", &op.name[..])[..]);
+                        code.push_str(&format!("return vec2(0.0, {});", &vertex.data.name[..])[..]);
 
                         code
                     },
@@ -269,8 +237,8 @@ impl ShaderBuilder {
         fs_src.push_str(HEADER);
         fs_src.push_str(&self.shader_code[..]);
         fs_src.push_str(FOOTER);
-        println!("Final shader code:");
-        println!("{}", fs_src);
+        //println!("Final shader code:");
+        //println!("{}", self.shader_code);
 
         let vs_src = "
         #version 430
@@ -285,6 +253,6 @@ impl ShaderBuilder {
             gl_Position = u_projection_matrix * u_model_matrix * vec4(position, 0.0, 1.0);
         }".to_string();
 
-        (vs_src, fs_src)
+        Program::new(vs_src, fs_src)
     }
 }

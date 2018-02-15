@@ -7,18 +7,19 @@ extern crate glutin;
 extern crate cgmath;
 extern crate uuid;
 
-mod program;
-mod operator;
-mod graph;
 mod bounding_rect;
 mod color;
+mod graph;
+mod network;
+mod operator;
+mod program;
 mod renderer;
 mod shader_builder;
 mod shader_string;
 
 use color::Color;
-use graph::Graph;
 use operator::{Op, OpType, MouseInfo};
+use network::Network;
 use program::Program;
 use renderer::Renderer;
 use shader_builder::ShaderBuilder;
@@ -44,9 +45,9 @@ fn main() {
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
 
     // Main objects
-    let mut graph = Graph::new();
+    let mut network = Network::new();
     let mut renderer = Renderer::new();
-    let mut shader_builder = ShaderBuilder::new();
+    let mut builder = ShaderBuilder::new();
 
     // Constants
     const ZOOM_INCREMENT: f32 = 0.05;
@@ -83,7 +84,7 @@ fn main() {
                         mouse_info.curr -= current_size * 0.5;
                         mouse_info.curr *= current_zoom;
 
-                        graph.handle_interaction(&mouse_info);
+                        network.handle_interaction(&mouse_info);
                     },
 
                     glutin::WindowEvent::MouseWheel {delta, .. } => {
@@ -105,7 +106,7 @@ fn main() {
                             mouse_info.clicked = mouse_info.curr;
                             mouse_info.down = true;
 
-                            graph.handle_interaction(&mouse_info);
+                            network.handle_interaction(&mouse_info);
                         }
                         else {
                             mouse_info.down = false;
@@ -129,10 +130,10 @@ fn main() {
                                         glutin::VirtualKeyCode::R => OpType::Render,
                                         _ => OpType::Sphere
                                     };
-                                    graph.add_op(op_type,mouse_info.curr - OPERATOR_SIZE * 0.5, OPERATOR_SIZE);
+                                    network.add_op(op_type,mouse_info.curr - OPERATOR_SIZE * 0.5, OPERATOR_SIZE);
                                 }
                                 if let Some(glutin::VirtualKeyCode::Delete) = input.virtual_keycode {
-                                    graph.delete_selected();
+                                    network.delete_selected();
                                 }
                             }
                         }
@@ -146,15 +147,18 @@ fn main() {
         clear();
 
         // Check to see if the graph needs to be rebuilt.
-        if graph.dirty() {
-            let program = shader_builder.traverse(&graph).unwrap();
-            renderer.set_preview_program(program);
+        if network.dirty() {
+            if let Some(root) = network.root {
+                let indices = network.graph.traverse(root);
+                let program = builder.build_sources(&network, indices).unwrap();
+                renderer.set_preview_program(program);
 
-            graph.clean();
+                network.clean();
+            }
         }
 
         // Draw the graph (ops, connections, etc.).
-        graph.draw(&renderer);
+        network.draw(&renderer);
 
         renderer.draw_preview();
 

@@ -1,30 +1,9 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
-
 use bounding_rect::BoundingRect;
-
 use cgmath::Vector2;
 use uuid::Uuid;
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-#[derive(Debug, Copy, Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct OpIndex(pub usize);
-
-impl From<usize> for OpIndex {
-    fn from(sz: usize) -> Self {
-        OpIndex(sz)
-    }
-}
-
-struct Node<T> {
-    data: T,
-    outputs: Vec<OpIndex>,
-    inputs: Vec<OpIndex>
-}
-
-struct Arena<T> {
-    nodes: Vec<Node<T>>
-}
 
 #[derive(PartialEq, Eq)]
 pub enum OpType {
@@ -158,10 +137,7 @@ trait InterfaceElement {
 }
 
 pub struct Op {
-    /// The index of this op in the memory arena
-    pub index: OpIndex,
-
-    /// The number of ops that are currently connect to this op
+    /// The number of ops currently connected to this op
     pub active_inputs: usize,
 
     /// The bounding box of the op
@@ -183,35 +159,37 @@ pub struct Op {
     pub name: String,
 
     /// The op type
-    pub op_type: OpType
+    pub family: OpType
 }
 
 impl Op {
 
-    pub fn new(index: OpIndex, op_type: OpType, upper_left: Vector2<f32>, size: Vector2<f32>) -> Op {
+    pub fn new(family: OpType, position: Vector2<f32>, size: Vector2<f32>) -> Op {
         const SLOT_SIZE: Vector2<f32> = Vector2{ x: 12.0, y: 12.0 };
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
         // The bounding region of the op itself
-        let aabb_op = BoundingRect::new(upper_left, size);
+        let aabb_op = BoundingRect::new(position, size);
 
         // The small bounding region of the input connection slot for this operator
-        let aabb_slot_input = BoundingRect::new(Vector2::new(upper_left.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
+        let aabb_slot_input = BoundingRect::new(Vector2::new(position.x - SLOT_SIZE.x * 0.5, position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
                                                             SLOT_SIZE);
 
         // The small bounding region of the output connection slot for this operator
-        let aabb_slot_output = BoundingRect::new(Vector2::new(upper_left.x + size.x - SLOT_SIZE.x * 0.5, upper_left.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
+        let aabb_slot_output = BoundingRect::new(Vector2::new(position.x + size.x - SLOT_SIZE.x * 0.5, position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
                                                             SLOT_SIZE);
+
+        let name = format!("{}_{}", family.to_string(), count);
+
         Op {
-            index,
             active_inputs: 0,
             aabb_op,
             aabb_slot_input,
             aabb_slot_output,
             state: InteractionState::Deselected,
             uuid: Uuid::new_v4(),
-            name: format!("{}_{}", op_type.to_string(), count),
-            op_type
+            name,
+            family
         }
     }
 
@@ -230,8 +208,7 @@ impl Op {
     pub fn connect_to(&mut self, other: &mut Op) -> bool {
         // Make sure that this op's output slot is active and the
         // other op's input slot isn't already at capacity.
-        if self.op_type.has_outputs() && other.get_number_of_active_inputs() < other.op_type.get_input_capacity() {
-            self.active_inputs += 1;
+        if self.family.has_outputs() && other.get_number_of_active_inputs() < other.family.get_input_capacity() {
             return true;
         }
         false

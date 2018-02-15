@@ -269,7 +269,7 @@ impl Renderer {
             gl::VertexArrayVertexBuffer(self.vao, 0, self.vbo_line, 0, (4 * mem::size_of::<GLfloat>()) as i32);
 
             gl::BindVertexArray(self.vao);
-            gl::DrawArrays(gl::LINES, 0, data.len() as i32);
+            gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);
         }
 
         self.program.unbind();
