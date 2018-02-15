@@ -208,8 +208,8 @@ impl Network {
 
     pub fn handle_interaction(&mut self, mouse_info: &MouseInfo) {
         let mut connecting = false;
-        let mut src: usize = 0;
-        let mut dst: usize = 0;
+        let mut src: Option<usize> = None;
+        let mut dst: Option<usize> = None;
 
         for (index, vertex) in self.graph.vertices.iter_mut().enumerate() {
 
@@ -218,10 +218,10 @@ impl Network {
                     // If this operator is currently being connected to another:
                     // 1) Set the `connecting` flag to `true`, as the user is
                     //    performing a potential op connection
-                    // 2) Store its UUID as a potential connect source
+                    // 2) Store its graph index as a potential connect source
                     // 3) Skip the rest of this loop iteration
                     connecting = true;
-                    src = index;
+                    src = Some(index);
                     continue;
                 } else {
                     // Otherwise, deselect this op
@@ -256,7 +256,7 @@ impl Network {
                         vertex.data.state = InteractionState::ConnectSource;
 
                         // Store the connection source index.
-                        src = index;
+                        src = Some(index);
 
                     } else {
                         // This op has been selected.
@@ -296,28 +296,30 @@ impl Network {
         // If the mouse is dragging from the output slot of one operator,
         // check if a potential connection has happened (i.e. the mouse
         // is now over an input slot of a different operator).
-        let mut found_new_connection = false;
-
         if connecting {
             for (index, vertex) in self.graph.vertices.iter_mut().enumerate() {
 
-                // Make sure that the user is not trying to connect an operator to itself.
-                if vertex.data.aabb_slot_input.inside_with_padding(&mouse_info.curr, 6.0) && src != index {
+                // Is the mouse now inside of a different op's input slot region?
+                if vertex.data.aabb_slot_input.inside_with_padding(&mouse_info.curr, 12.0) {
+
                     vertex.data.state = InteractionState::ConnectDestination;
-                    dst = index;
 
                     // Only add the connection if:
+                    // 1) A source index was found
                     // 1) The destination op actually accepts inputs
                     // 2) The connection doesn't already exist
-                    if vertex.data.family.has_inputs() && !self.graph.edges[src].outputs.contains(&dst) {
-                        found_new_connection = true;
+                    // 3) The source and destination indices aren't the same
+                    if let Some(src) = src {
+                        if vertex.data.family.has_inputs() && !self.graph.edges[src].outputs.contains(&index) && src != index {
+                            dst = Some(index);
+                        }
                     }
                 }
 
             }
         }
 
-        if found_new_connection {
+        if let (Some(src), Some(dst)) = (src, dst) {
             self.add_connection(src, dst);
         }
     }

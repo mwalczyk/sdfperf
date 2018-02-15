@@ -3,10 +3,8 @@
   <component name="ChangeListManager">
     <list default="true" id="5a55896d-0f86-46ac-bce9-9b3308ba49a0" name="Default" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="$PROJECT_DIR$/src/graph.rs" afterPath="$PROJECT_DIR$/src/graph.rs" />
-      <change beforePath="$PROJECT_DIR$/src/main.rs" afterPath="$PROJECT_DIR$/src/main.rs" />
-      <change beforePath="$PROJECT_DIR$/src/operator.rs" afterPath="$PROJECT_DIR$/src/operator.rs" />
-      <change beforePath="$PROJECT_DIR$/src/renderer.rs" afterPath="$PROJECT_DIR$/src/renderer.rs" />
+      <change beforePath="$PROJECT_DIR$/src/bindings.rs" afterPath="" />
+      <change beforePath="$PROJECT_DIR$/src/network.rs" afterPath="$PROJECT_DIR$/src/network.rs" />
       <change beforePath="$PROJECT_DIR$/src/shader_builder.rs" afterPath="$PROJECT_DIR$/src/shader_builder.rs" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
@@ -30,11 +28,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="network.rs" pinned="false" current-in-tab="true">
+      <file leaf-file-name="network.rs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/network.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="250">
-              <caret line="89" column="9" lean-forward="true" selection-start-line="89" selection-start-column="9" selection-end-line="89" selection-end-column="9" />
+            <state relative-caret-position="66">
+              <caret line="294" column="0" lean-forward="false" selection-start-line="294" selection-start-column="0" selection-end-line="294" selection-end-column="0" />
               <folding>
                 <element signature="e#1874#1875#0" expanded="true" />
                 <element signature="e#1899#1900#0" expanded="true" />
@@ -42,7 +40,6 @@
                 <element signature="e#2006#2007#0" expanded="true" />
                 <element signature="e#3443#4297#0" expanded="false" />
                 <element signature="e#4389#4513#0" expanded="false" />
-                <element signature="e#4617#5597#0" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -78,11 +75,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="shader_builder.rs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="shader_builder.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/shader_builder.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="324">
-              <caret line="244" column="17" lean-forward="false" selection-start-line="244" selection-start-column="17" selection-end-line="244" selection-end-column="17" />
+            <state relative-caret-position="468">
+              <caret line="240" column="8" lean-forward="false" selection-start-line="240" selection-start-column="8" selection-end-line="240" selection-end-column="8" />
               <folding />
             </state>
           </provider>
@@ -146,8 +143,8 @@
         <option value="$PROJECT_DIR$/src/operator.rs" />
         <option value="$PROJECT_DIR$/src/graph.rs" />
         <option value="$PROJECT_DIR$/src/renderer.rs" />
-        <option value="$PROJECT_DIR$/src/shader_builder.rs" />
         <option value="$PROJECT_DIR$/src/network.rs" />
+        <option value="$PROJECT_DIR$/src/shader_builder.rs" />
       </list>
     </option>
   </component>
@@ -389,7 +386,7 @@
       <window_info id="Cargo" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.13802083" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Palette&#9;" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.30510315" sideWeight="0.29947916" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.2931596" sideWeight="0.7005208" order="2" side_tool="false" content_ui="tabs" x="546" y="346" width="1146" height="653" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.23669924" sideWeight="0.7005208" order="2" side_tool="false" content_ui="tabs" x="546" y="346" width="1146" height="653" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
@@ -758,14 +755,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/shader_builder.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="324">
-          <caret line="244" column="17" lean-forward="false" selection-start-line="244" selection-start-column="17" selection-end-line="244" selection-end-column="17" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/graph.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1133">
@@ -776,8 +765,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/network.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="250">
-          <caret line="89" column="9" lean-forward="true" selection-start-line="89" selection-start-column="9" selection-end-line="89" selection-end-column="9" />
+        <state relative-caret-position="66">
+          <caret line="294" column="0" lean-forward="false" selection-start-line="294" selection-start-column="0" selection-end-line="294" selection-end-column="0" />
           <folding>
             <element signature="e#1874#1875#0" expanded="true" />
             <element signature="e#1899#1900#0" expanded="true" />
@@ -785,8 +774,15 @@
             <element signature="e#2006#2007#0" expanded="true" />
             <element signature="e#3443#4297#0" expanded="false" />
             <element signature="e#4389#4513#0" expanded="false" />
-            <element signature="e#4617#5597#0" expanded="false" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/shader_builder.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="468">
+          <caret line="240" column="8" lean-forward="false" selection-start-line="240" selection-start-column="8" selection-end-line="240" selection-end-column="8" />
+          <folding />
         </state>
       </provider>
     </entry>

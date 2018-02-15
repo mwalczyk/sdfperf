@@ -237,8 +237,8 @@ impl ShaderBuilder {
         fs_src.push_str(HEADER);
         fs_src.push_str(&self.shader_code[..]);
         fs_src.push_str(FOOTER);
-        //println!("Final shader code:");
-        //println!("{}", self.shader_code);
+        println!("Final shader code:");
+        println!("{}", self.shader_code);
 
         let vs_src = "
         #version 430
