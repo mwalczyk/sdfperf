@@ -1,6 +1,6 @@
 use gl;
 use gl::types::*;
-use cgmath::{self, Matrix, Matrix4, SquareMatrix, One, PerspectiveFov, Vector2, Vector4, Zero };
+use cgmath::{self, Matrix, Matrix4, One, PerspectiveFov, SquareMatrix, Vector2, Vector4, Zero};
 
 use bounding_rect::BoundingRect;
 use color::Color;
@@ -47,11 +47,10 @@ pub struct Renderer {
     aabb_preview: BoundingRect,
 
     /// An application timer
-    time: SystemTime
+    time: SystemTime,
 }
 
 impl Renderer {
-
     /// Constructs and returns a new renderer instance.
     pub fn new() -> Renderer {
         static VERTEX_DATA: [GLfloat; 24] = [
@@ -127,8 +126,10 @@ impl Renderer {
         }";
 
         // Compile the shader program.
-        let draw_program = Program::new(COMMON_VS_SRC.to_string(), DRAW_FS_SRC.to_string()).unwrap();
-        let fallback_program = Program::new(COMMON_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
+        let draw_program =
+            Program::new(COMMON_VS_SRC.to_string(), DRAW_FS_SRC.to_string()).unwrap();
+        let fallback_program =
+            Program::new(COMMON_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
 
         // Setup buffers.
         let mut vao = 0;
@@ -142,16 +143,32 @@ impl Renderer {
             // Create the VBO for rendering rectangles.
             let vbo_rect_size = (VERTEX_DATA.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::CreateBuffers(1, &mut vbo_rect);
-            gl::NamedBufferData(vbo_rect, vbo_rect_size, mem::transmute(&VERTEX_DATA[0]), gl::STATIC_DRAW);
+            gl::NamedBufferData(
+                vbo_rect,
+                vbo_rect_size,
+                mem::transmute(&VERTEX_DATA[0]),
+                gl::STATIC_DRAW,
+            );
 
             // Create the VBO for rendering lines.
             let vbo_line_size = (200 * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::CreateBuffers(1, &mut vbo_line);
-            gl::NamedBufferStorage(vbo_line, vbo_line_size, ptr::null(), gl::DYNAMIC_STORAGE_BIT);
+            gl::NamedBufferStorage(
+                vbo_line,
+                vbo_line_size,
+                ptr::null(),
+                gl::DYNAMIC_STORAGE_BIT,
+            );
 
             // This is not strictly necessary, but we do it for completeness sake.
-            let pos_attr = gl::GetAttribLocation(draw_program.program_id, CString::new("position").unwrap().as_ptr());
-            let tex_attr = gl::GetAttribLocation(draw_program.program_id, CString::new("texcoord").unwrap().as_ptr());
+            let pos_attr = gl::GetAttribLocation(
+                draw_program.program_id,
+                CString::new("position").unwrap().as_ptr(),
+            );
+            let tex_attr = gl::GetAttribLocation(
+                draw_program.program_id,
+                CString::new("texcoord").unwrap().as_ptr(),
+            );
             let tex_offset = (2 * mem::size_of::<GLfloat>()) as GLuint;
 
             // Create the VAO and setup vertex attributes.
@@ -159,16 +176,36 @@ impl Renderer {
 
             // Position attribute.
             gl::EnableVertexArrayAttrib(vao, pos_attr as GLuint);
-            gl::VertexArrayAttribFormat(vao, pos_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, 0);
+            gl::VertexArrayAttribFormat(
+                vao,
+                pos_attr as GLuint,
+                2,
+                gl::FLOAT,
+                gl::FALSE as GLboolean,
+                0,
+            );
             gl::VertexArrayAttribBinding(vao, pos_attr as GLuint, 0);
 
             // Texture coordinates attribute.
             gl::EnableVertexArrayAttrib(vao, tex_attr as GLuint);
-            gl::VertexArrayAttribFormat(vao, tex_attr as GLuint, 2, gl::FLOAT, gl::FALSE as GLboolean, tex_offset);
+            gl::VertexArrayAttribFormat(
+                vao,
+                tex_attr as GLuint,
+                2,
+                gl::FLOAT,
+                gl::FALSE as GLboolean,
+                tex_offset,
+            );
             gl::VertexArrayAttribBinding(vao, tex_attr as GLuint, 0);
 
             // Associate the VBO with bind point 0.
-            gl::VertexArrayVertexBuffer(vao, 0, vbo_rect, 0, (4 * mem::size_of::<GLfloat>()) as i32);
+            gl::VertexArrayVertexBuffer(
+                vao,
+                0,
+                vbo_rect,
+                0,
+                (4 * mem::size_of::<GLfloat>()) as i32,
+            );
         }
 
         let mut renderer = Renderer {
@@ -181,8 +218,8 @@ impl Renderer {
             network_resolution: Vector2::new(800.0, 600.0),
             preview_program: None,
             fallback_program,
-            aabb_preview: BoundingRect::new(Vector2::new(100.0, 000.0),Vector2::new(300.0, 300.0)),
-            time: SystemTime::now()
+            aabb_preview: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
+            time: SystemTime::now(),
         };
 
         renderer.zoom(1.0);
@@ -207,12 +244,14 @@ impl Renderer {
     /// Rebuild the projection matrix:
     /// L, R, B, T, N, F
     fn rebuild_projection_matrix(&mut self) {
-        self.projection = cgmath::ortho(-(self.network_resolution.x * 0.5) * self.network_zoom,
-                                        (self.network_resolution.x * 0.5) * self.network_zoom,
-                                        (self.network_resolution.y * 0.5) * self.network_zoom,
-                                        -(self.network_resolution.y * 0.5) * self.network_zoom,
-                                        -1.0,
-                                        1.0);
+        self.projection = cgmath::ortho(
+            -(self.network_resolution.x * 0.5) * self.network_zoom,
+            (self.network_resolution.x * 0.5) * self.network_zoom,
+            (self.network_resolution.y * 0.5) * self.network_zoom,
+            -(self.network_resolution.y * 0.5) * self.network_zoom,
+            -1.0,
+            1.0,
+        );
     }
 
     /// Sets the shader program that will be used to render a
@@ -239,8 +278,10 @@ impl Renderer {
             program.uniform_matrix_4f("u_projection_matrix", &self.projection);
         } else {
             self.fallback_program.bind();
-            self.fallback_program.uniform_matrix_4f("u_model_matrix", &model);
-            self.fallback_program.uniform_matrix_4f("u_projection_matrix", &self.projection);
+            self.fallback_program
+                .uniform_matrix_4f("u_model_matrix", &model);
+            self.fallback_program
+                .uniform_matrix_4f("u_projection_matrix", &self.projection);
         }
 
         // Next, issue a draw call.
@@ -262,15 +303,25 @@ impl Renderer {
 
         // First, set all relevant uniforms.
         let model = rect.get_model_matrix();
-        self.draw_program.uniform_matrix_4f("u_model_matrix", &model);
-        self.draw_program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        self.draw_program.uniform_4f("u_draw_color", &(*color).into());
+        self.draw_program
+            .uniform_matrix_4f("u_model_matrix", &model);
+        self.draw_program
+            .uniform_matrix_4f("u_projection_matrix", &self.projection);
+        self.draw_program
+            .uniform_4f("u_draw_color", &(*color).into());
         self.draw_program.uniform_1ui("u_draw_mode", 0);
-        self.draw_program.uniform_1f("u_time", self.get_elapsed_seconds());
+        self.draw_program
+            .uniform_1f("u_time", self.get_elapsed_seconds());
 
         // Next, issue a draw call.
         unsafe {
-            gl::VertexArrayVertexBuffer(self.vao, 0, self.vbo_rect, 0, (4 * mem::size_of::<GLfloat>()) as i32);
+            gl::VertexArrayVertexBuffer(
+                self.vao,
+                0,
+                self.vbo_rect,
+                0,
+                (4 * mem::size_of::<GLfloat>()) as i32,
+            );
 
             gl::BindVertexArray(self.vao);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
@@ -285,18 +336,28 @@ impl Renderer {
 
         // First, set all relevant uniforms.
         let model = Matrix4::identity();
-        self.draw_program.uniform_matrix_4f("u_model_matrix", &model);
-        self.draw_program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        self.draw_program.uniform_4f("u_draw_color", &(*color).into());
+        self.draw_program
+            .uniform_matrix_4f("u_model_matrix", &model);
+        self.draw_program
+            .uniform_matrix_4f("u_projection_matrix", &self.projection);
+        self.draw_program
+            .uniform_4f("u_draw_color", &(*color).into());
         self.draw_program.uniform_1ui("u_draw_mode", 1);
-        self.draw_program.uniform_1f("u_time", self.get_elapsed_seconds());
+        self.draw_program
+            .uniform_1f("u_time", self.get_elapsed_seconds());
 
         // Next, update buffer storage and issue a draw call.
         unsafe {
             let data_size = (data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::NamedBufferSubData(self.vbo_line, 0, data_size, data.as_ptr() as *const c_void);
 
-            gl::VertexArrayVertexBuffer(self.vao, 0, self.vbo_line, 0, (4 * mem::size_of::<GLfloat>()) as i32);
+            gl::VertexArrayVertexBuffer(
+                self.vao,
+                0,
+                self.vbo_line,
+                0,
+                (4 * mem::size_of::<GLfloat>()) as i32,
+            );
 
             gl::BindVertexArray(self.vao);
             gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);

@@ -12,11 +12,10 @@ pub struct Preview {
 
     aabb: BoundingRect,
 
-    lookat: Matrix4<f32>
+    lookat: Matrix4<f32>,
 }
 
 impl Preview {
-
     pub fn new() {
         static FALLBACK_VS_SRC: &'static str = "
         #version 430
@@ -51,7 +50,8 @@ impl Preview {
             o_color = vec4(vec3(checkerboard), 1.0);;
         }";
 
-        let fallback_program = Program::new(FALLBACK_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
+        let fallback_program =
+            Program::new(FALLBACK_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
     }
 
     pub fn handle_interaction(&self, mouse: &MouseInfo) {
@@ -59,8 +59,6 @@ impl Preview {
     }
 
     pub fn draw(&self, renderer: &Renderer) {
-        if let Some(ref program) = self.valid_program {
-
-        }
+        if let Some(ref program) = self.valid_program {}
     }
 }

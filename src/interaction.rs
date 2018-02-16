@@ -4,7 +4,7 @@ pub struct MouseInfo {
     pub curr: Vector2<f32>,
     pub last: Vector2<f32>,
     pub clicked: Vector2<f32>,
-    pub down: bool
+    pub down: bool,
 }
 
 pub enum InteractionState {
@@ -12,7 +12,7 @@ pub enum InteractionState {
     Selected,
     Hover,
     ConnectSource,
-    ConnectDestination
+    ConnectDestination,
 }
 
 trait InterfaceElement {

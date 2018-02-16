@@ -9,17 +9,15 @@ pub struct ShaderBuilder {
 }
 
 impl ShaderBuilder {
-
     pub fn new() -> ShaderBuilder {
         ShaderBuilder {
-            shader_code: "".to_string()
+            shader_code: "".to_string(),
         }
     }
 
     /// Given a list of op indices in the proper post-order, builds
     /// and returns the appropriate shader code.
     pub fn build_sources(&mut self, network: &Network, indices: Vec<usize>) -> Option<Program> {
-
         // TODO: each op will need something like this as part of its shader code
         static TRANSFORMS: &str = "
         struct transform
@@ -163,7 +161,7 @@ impl ShaderBuilder {
                     vec3 n = calculate_normal(hit);
                     vec3 l = normalize(vec3(1.0, 5.0, 0.0));
                     float d = max(0.0, dot(n, l));
-                    color = n * 0.5 + 0.5; //vec3(d);
+                    color = vec3(d); //n * 0.5 + 0.5;
                     break;
                 case 1:
                     // Placeholder
@@ -189,20 +187,18 @@ impl ShaderBuilder {
                 // Append this op's line of shader code with a leading
                 // tab and trailing newline.
                 let mut formatted = match vertex.data.family {
-
-                    OpType::Sphere | OpType::Box | OpType::Plane => {
-                        vertex.data.family.get_formatted(vec![
-                            vertex.data.name.clone()
-                        ])
-                    },
+                    OpType::Sphere | OpType::Box | OpType::Plane => vertex
+                        .data
+                        .family
+                        .get_formatted(vec![vertex.data.name.clone()]),
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
                         let src_a = network.graph.edges[index].inputs[0];
                         let src_b = network.graph.edges[index].inputs[1];
                         vertex.data.family.get_formatted(vec![
-                            vertex.data.name.clone(),                                        // This op's name
+                            vertex.data.name.clone(),                                   // This op's name
                             network.graph.get_vertex(src_a).unwrap().data.name.clone(), // The name of this op's 1st input
-                            network.graph.get_vertex(src_b).unwrap().data.name.clone()  // The name of this op's 2nd input
+                            network.graph.get_vertex(src_b).unwrap().data.name.clone(), // The name of this op's 2nd input
                         ])
                     }
 
@@ -210,8 +206,8 @@ impl ShaderBuilder {
                         let src = network.graph.edges[index].inputs[0];
                         let name = network.graph.get_vertex(src).unwrap().data.name.clone();
                         let mut code = vertex.data.family.get_formatted(vec![
-                            vertex.data.name.clone(),                                // This op's name
-                            name                                                     // The input op's name
+                            vertex.data.name.clone(), // This op's name
+                            name,                     // The input op's name
                         ]);
 
                         // Add the final `return` in the `map(..)` function.
@@ -220,9 +216,9 @@ impl ShaderBuilder {
                         code.push_str(&format!("return vec2(0.0, {});", &vertex.data.name[..])[..]);
 
                         code
-                    },
+                    }
 
-                    _ => "// empty".to_string()
+                    _ => "// empty".to_string(),
                 };
 
                 // Add a tab indent before each new line of shader code and a newline
@@ -251,7 +247,8 @@ impl ShaderBuilder {
             vs_texcoord = texcoord;
 
             gl_Position = u_projection_matrix * u_model_matrix * vec4(position, 0.0, 1.0);
-        }".to_string();
+        }"
+            .to_string();
 
         Program::new(vs_src, fs_src)
     }

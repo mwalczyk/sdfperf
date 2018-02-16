@@ -1,9 +1,9 @@
-use cgmath::{self, Vector2, Vector4, Zero };
+use cgmath::{self, Vector2, Vector4, Zero};
 use uuid::Uuid;
 
 use color::Color;
 use graph::Graph;
-use interaction::{MouseInfo, InteractionState};
+use interaction::{InteractionState, MouseInfo};
 use operator::{Op, OpType};
 use renderer::Renderer;
 
@@ -34,7 +34,7 @@ pub struct Network {
 
     /// A flag that control whether or not the shader graph
     /// needs to be rebuilt
-    dirty: bool
+    dirty: bool,
 }
 
 enum Pair<T> {
@@ -60,14 +60,13 @@ fn index_twice<T>(slc: &mut [T], a: usize, b: usize) -> Pair<&mut T> {
 }
 
 impl Network {
-
     /// Constructs a new, empty network.
     pub fn new() -> Network {
         Network {
             graph: Graph::new(),
             selection: None,
             root: None,
-            dirty: false
+            dirty: false,
         }
     }
 
@@ -84,6 +83,20 @@ impl Network {
 
     pub fn delete_selected(&mut self) {
         if let Some(selected) = self.selection {
+            // Before removing this vertex from the graph,
+            // check to see if it is connected to the root
+            // (if one exists). If so, then the shader
+            // graph needs to be rebuilt.
+            if let Some(root) = self.root {
+                for edge in self.graph.edges[selected].outputs.iter() {
+                    if *edge == root {
+                        self.dirty = true;
+                        self.root = None;
+                        break;
+                    }
+                }
+            }
+
             self.graph.remove_vertex(selected);
             self.selection = None;
             println!("Number of vertices: {}", self.graph.vertices.len());
@@ -103,14 +116,16 @@ impl Network {
     fn color_for_op(&self, op: &Op) -> Color {
         let mut color = match op.family {
             OpType::Sphere | OpType::Box | OpType::Plane => Color::from_hex(0x8F719D),
-            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => Color::from_hex(0xA8B6C5),
-            OpType::Render => Color::from_hex(0xC77832)
+            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
+                Color::from_hex(0xA8B6C5)
+            }
+            OpType::Render => Color::from_hex(0xC77832),
         };
 
         // Add a contribution based on the op's current interaction state.
         color += match op.state {
-            InteractionState::Hover => Color::mono(0.05,0.0),
-            _ => Color::black()
+            InteractionState::Hover => Color::mono(0.05, 0.0),
+            _ => Color::black(),
         };
 
         color
@@ -128,10 +143,14 @@ impl Network {
             InteractionState::Selected => {
                 let aabb_select = op.aabb_op.expand_from_center(&Vector2::new(6.0, 6.0));
                 renderer.draw_rect(&aabb_select, &Color::from_hex(0x76B264));
-            },
-            InteractionState::ConnectSource => renderer.draw_rect(&op.aabb_slot_output, &slot_color),
-            InteractionState::ConnectDestination => renderer.draw_rect(&op.aabb_slot_input, &slot_color),
-            _ => ()
+            }
+            InteractionState::ConnectSource => {
+                renderer.draw_rect(&op.aabb_slot_output, &slot_color)
+            }
+            InteractionState::ConnectDestination => {
+                renderer.draw_rect(&op.aabb_slot_input, &slot_color)
+            }
+            _ => (),
         }
 
         renderer.draw_rect(&op.aabb_op, &self.color_for_op(op));
@@ -149,9 +168,7 @@ impl Network {
         let mut points = Vec::new();
 
         for (src, edges) in self.graph.edges.iter().enumerate() {
-
             for dst in edges.outputs.iter() {
-
                 let src_vert = self.graph.get_vertex(src).unwrap();
                 let dst_vert = self.graph.get_vertex(*dst).unwrap();
 
@@ -186,13 +203,12 @@ impl Network {
 
     /// Adds a new connection between two ops.
     pub fn add_connection(&mut self, a: usize, b: usize) {
-
         self.graph.add_edge(a, b);
 
         if let Pair::Both(vert_a, vert_b) = index_twice(&mut self.graph.vertices, a, b) {
             // If we are connecting to a render op, then the shader
             // must be rebuilt.
-            if  vert_b.data.family == OpType::Render {
+            if vert_b.data.family == OpType::Render {
                 self.root = Some(b);
                 self.dirty = true;
                 println!("Connected to render node: building graph");
@@ -201,7 +217,6 @@ impl Network {
             // Deselect both ops.
             vert_a.data.state = InteractionState::Deselected;
             vert_b.data.state = InteractionState::Deselected;
-
         } else {
             println!("Attempting to connect two ops with the same index - something is wrong here")
         }
@@ -213,7 +228,6 @@ impl Network {
         let mut dst: Option<usize> = None;
 
         for (index, vertex) in self.graph.vertices.iter_mut().enumerate() {
-
             if let InteractionState::ConnectSource = vertex.data.state {
                 if mouse_info.down {
                     // If this operator is currently being connected to another:
@@ -232,13 +246,10 @@ impl Network {
 
             // Is the mouse inside of this op's bounding box?
             if vertex.data.aabb_op.inside(&mouse_info.curr) {
-
                 // Is there an op currently selected?
                 if let Some(selected) = self.selection {
-
                     // Is this op the selected op?
-                    if selected == index  {
-
+                    if selected == index {
                         // Is the mouse down?
                         if mouse_info.down {
                             vertex.data.translate(&(mouse_info.curr - mouse_info.last));
@@ -250,15 +261,17 @@ impl Network {
                 // This op is not the selected op, but we are inside of it's
                 // bounding box. Is the mouse down?
                 if mouse_info.down {
-
                     // Are we inside the bounds of this op's output slot?
-                    if vertex.data.aabb_slot_output.inside_with_padding(&mouse_info.curr, 12.0) {
+                    if vertex
+                        .data
+                        .aabb_slot_output
+                        .inside_with_padding(&mouse_info.curr, 12.0)
+                    {
                         // This op is now a potential connection source.
                         vertex.data.state = InteractionState::ConnectSource;
 
                         // Store the connection source index.
                         src = Some(index);
-
                     } else {
                         // This op has been selected.
                         vertex.data.state = InteractionState::Selected;
@@ -266,8 +279,7 @@ impl Network {
                         // Store the selected UUID.
                         self.selection = Some(index);
                     }
-                }
-                else {
+                } else {
                     // Otherwise, the mouse is still inside the bounds of this op,
                     // so we must be hovering over it.
                     vertex.data.state = InteractionState::Hover;
@@ -275,10 +287,8 @@ impl Network {
 
             // The mouse is not inside of this op's bounding box.
             } else {
-
                 // Is there an op currently selected?
                 if let Some(selected) = self.selection {
-
                     // Is this op the selected op?
                     if selected == index {
                         // Keep this op selected.
@@ -299,10 +309,12 @@ impl Network {
         // is now over an input slot of a different operator).
         if connecting {
             for (index, vertex) in self.graph.vertices.iter_mut().enumerate() {
-
                 // Is the mouse now inside of a different op's input slot region?
-                if vertex.data.aabb_slot_input.inside_with_padding(&mouse_info.curr, 12.0) {
-
+                if vertex
+                    .data
+                    .aabb_slot_input
+                    .inside_with_padding(&mouse_info.curr, 12.0)
+                {
                     vertex.data.state = InteractionState::ConnectDestination;
 
                     // Only add the connection if:
@@ -311,12 +323,14 @@ impl Network {
                     // 2) The connection doesn't already exist
                     // 3) The source and destination indices aren't the same
                     if let Some(src) = src {
-                        if vertex.data.family.has_inputs() && !self.graph.edges[src].outputs.contains(&index) && src != index {
+                        if vertex.data.family.has_inputs()
+                            && !self.graph.edges[src].outputs.contains(&index)
+                            && src != index
+                        {
                             dst = Some(index);
                         }
                     }
                 }
-
             }
         }
 

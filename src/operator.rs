@@ -30,7 +30,6 @@ pub enum OpType {
 
     /// Final output node, required to render the graph
     Render,
-
     // TODO (materials): AmbientOcclusion, Normals, Phong, Constant
     // TODO (transforms): Scale, Translate, Rotate
     // TODO (repeaters): ModRepeat, ModRepeatCircular
@@ -39,7 +38,6 @@ pub enum OpType {
 }
 
 impl OpType {
-
     /// Converts the enum variant into a human-readable string format.
     pub fn to_string(&self) -> String {
         match *self {
@@ -49,7 +47,7 @@ impl OpType {
             OpType::Union => "union".to_string(),
             OpType::Intersection => "intersection".to_string(),
             OpType::SmoothMinimum => "smooth_minimum".to_string(),
-            OpType::Render => "render".to_string()
+            OpType::Render => "render".to_string(),
         }
     }
 
@@ -61,7 +59,7 @@ impl OpType {
         match *self {
             OpType::Sphere | OpType::Box | OpType::Plane => 0,
             OpType::Union | OpType::Intersection | OpType::SmoothMinimum => 2,
-            OpType::Render => 1
+            OpType::Render => 1,
         }
     }
 
@@ -76,7 +74,7 @@ impl OpType {
     pub fn has_outputs(&self) -> bool {
         match *self {
             OpType::Render => false,
-            _ => true
+            _ => true,
         }
     }
 
@@ -86,13 +84,13 @@ impl OpType {
         match *self {
             OpType::Sphere => "float {} = sdf_sphere(p, vec3(0.0), 5.0);".to_string(),
             OpType::Box => "float {} = sdf_box(p, vec3(4.0));".to_string(),
-            OpType::Plane => "float {} = sdf_plane(p, {}, {});".to_string(),
+            OpType::Plane => "float {} = sdf_plane(p, 0.0);".to_string(),
             OpType::Union => "float {} = op_union({}, {});".to_string(),
             OpType::Intersection => "float {} = op_intersect({}, {});".to_string(),
             OpType::SmoothMinimum => "float {} = op_smooth_min({}, {}, 1.0);".to_string(),
-            OpType::Render => "float {} = {};".to_string()
+            OpType::Render => "float {} = {};".to_string(),
         }
-}
+    }
 
     /// Returns the number of `{}` entries in the unformatted shader code
     /// corresponding to this op type.
@@ -100,7 +98,7 @@ impl OpType {
         match *self {
             OpType::Sphere | OpType::Box | OpType::Plane => 1,
             OpType::Union | OpType::Intersection | OpType::SmoothMinimum => 3,
-            OpType::Render => 2
+            OpType::Render => 2,
         }
     }
 
@@ -139,29 +137,38 @@ pub struct Op {
     /// A unique, numeric identifier - no two ops will have the same UUID
     pub uuid: Uuid,
 
-    /// The name of the op (i.e. "sphere_0")
+    /// The name of the op (i.e. "sphere_0") as it will appear in the shader
     pub name: String,
 
     /// The op type
-    pub family: OpType
+    pub family: OpType,
 }
 
 impl Op {
-
     pub fn new(family: OpType, position: Vector2<f32>, size: Vector2<f32>) -> Op {
-        const SLOT_SIZE: Vector2<f32> = Vector2{ x: 12.0, y: 12.0 };
+        const SLOT_SIZE: Vector2<f32> = Vector2 { x: 12.0, y: 12.0 };
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
         // The bounding region of the op itself
         let aabb_op = BoundingRect::new(position, size);
 
         // The small bounding region of the input connection slot for this operator
-        let aabb_slot_input = BoundingRect::new(Vector2::new(position.x - SLOT_SIZE.x * 0.5, position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
-                                                            SLOT_SIZE);
+        let aabb_slot_input = BoundingRect::new(
+            Vector2::new(
+                position.x - SLOT_SIZE.x * 0.5,
+                position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5,
+            ),
+            SLOT_SIZE,
+        );
 
         // The small bounding region of the output connection slot for this operator
-        let aabb_slot_output = BoundingRect::new(Vector2::new(position.x + size.x - SLOT_SIZE.x * 0.5, position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5),
-                                                            SLOT_SIZE);
+        let aabb_slot_output = BoundingRect::new(
+            Vector2::new(
+                position.x + size.x - SLOT_SIZE.x * 0.5,
+                position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5,
+            ),
+            SLOT_SIZE,
+        );
 
         let name = format!("{}_{}", family.to_string(), count);
 
@@ -173,7 +180,7 @@ impl Op {
             state: InteractionState::Deselected,
             uuid: Uuid::new_v4(),
             name,
-            family
+            family,
         }
     }
 
@@ -192,7 +199,9 @@ impl Op {
     pub fn connect_to(&mut self, other: &mut Op) -> bool {
         // Make sure that this op's output slot is active and the
         // other op's input slot isn't already at capacity.
-        if self.family.has_outputs() && other.get_number_of_active_inputs() < other.family.get_input_capacity() {
+        if self.family.has_outputs()
+            && other.get_number_of_active_inputs() < other.family.get_input_capacity()
+        {
             return true;
         }
         false
@@ -207,4 +216,3 @@ impl Op {
         self.aabb_slot_output.translate(offset);
     }
 }
-

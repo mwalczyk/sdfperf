@@ -1,14 +1,13 @@
-struct ShaderParam<T>(T,);
+struct ShaderParam<T>(T);
 
 struct ShaderString {
-    formattable_code: String
+    formattable_code: String,
 }
 
 impl ShaderString {
-
     fn new() -> ShaderString {
         ShaderString {
-            formattable_code: "float s = sphere(p, {}, {})".to_string()
+            formattable_code: "float s = sphere(p, {}, {})".to_string(),
         }
     }
 

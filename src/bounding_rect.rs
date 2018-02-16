@@ -1,16 +1,16 @@
-use cgmath::{ Matrix, Matrix4, Vector2, Vector3 };
+use cgmath::{Matrix, Matrix4, Vector2, Vector3};
 
 pub enum Edge {
     Left,
     Right,
     Top,
-    Bottom
+    Bottom,
 }
 
 #[derive(PartialEq)]
 pub struct BoundingRect {
     pub upper_left: Vector2<f32>,
-    pub size: Vector2<f32>
+    pub size: Vector2<f32>,
 }
 
 impl BoundingRect {
@@ -35,28 +35,35 @@ impl BoundingRect {
     }
 
     pub fn inside(&self, point: &Vector2<f32>) -> bool {
-        if point.x > self.upper_left.x && point.x < (self.upper_left.x + self.size.x) &&
-           point.y > self.upper_left.y && point.y < (self.upper_left.y + self.size.y) {
+        if point.x > self.upper_left.x && point.x < (self.upper_left.x + self.size.x)
+            && point.y > self.upper_left.y && point.y < (self.upper_left.y + self.size.y)
+        {
             return true;
         }
         false
     }
 
     pub fn inside_with_padding(&self, point: &Vector2<f32>, padding: f32) -> bool {
-        if point.x > (self.upper_left.x - padding) && point.x < (self.upper_left.x + self.size.x + padding) &&
-           point.y > (self.upper_left.y - padding) && point.y < (self.upper_left.y + self.size.y + padding) {
+        if point.x > (self.upper_left.x - padding)
+            && point.x < (self.upper_left.x + self.size.x + padding)
+            && point.y > (self.upper_left.y - padding)
+            && point.y < (self.upper_left.y + self.size.y + padding)
+        {
             return true;
         }
         false
     }
 
     pub fn centroid(&self) -> Vector2<f32> {
-        Vector2::new(self.upper_left.x + self.size.x * 0.5,
-                     self.upper_left.y + self.size.y * 0.5)
+        Vector2::new(
+            self.upper_left.x + self.size.x * 0.5,
+            self.upper_left.y + self.size.y * 0.5,
+        )
     }
 
     pub fn get_model_matrix(&self) -> Matrix4<f32> {
-        let translation = Matrix4::from_translation(Vector3::new(self.upper_left.x, self.upper_left.y, 0.0));
+        let translation =
+            Matrix4::from_translation(Vector3::new(self.upper_left.x, self.upper_left.y, 0.0));
         let scale = Matrix4::from_nonuniform_scale(self.size.x, self.size.y, 0.0);
 
         translation * scale

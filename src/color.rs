@@ -7,11 +7,10 @@ pub struct Color {
     pub r: f32,
     pub g: f32,
     pub b: f32,
-    pub a: f32
+    pub a: f32,
 }
 
 impl Color {
-
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Color {
         Color { r, g, b, a }
     }
@@ -21,9 +20,9 @@ impl Color {
     }
 
     pub fn from_hex(code: u32) -> Color {
-        let r = ((code >> 16) & 0xFF) as f32 / 255.0;  // Extract the RR byte
-        let g = ((code >> 8) & 0xFF) as f32 / 255.0;   // Extract the GG byte
-        let b = ((code) & 0xFF) as f32 / 255.0;        // Extract the BB byte
+        let r = ((code >> 16) & 0xFF) as f32 / 255.0; // Extract the RR byte
+        let g = ((code >> 8) & 0xFF) as f32 / 255.0; // Extract the GG byte
+        let b = ((code) & 0xFF) as f32 / 255.0; // Extract the BB byte
         Color::new(r, g, b, 1.0)
     }
 
@@ -40,19 +39,23 @@ impl Add for Color {
     type Output = Color;
 
     fn add(self, other: Color) -> Color {
-        Color::new(self.r + other.r,
-                   self.g + other.g,
-                   self.b + other.b,
-                   self.a + other.a)
+        Color::new(
+            self.r + other.r,
+            self.g + other.g,
+            self.b + other.b,
+            self.a + other.a,
+        )
     }
 }
 
 impl AddAssign for Color {
     fn add_assign(&mut self, other: Color) {
-        *self = Color::new(self.r + other.r,
-                           self.g + other.g,
-                           self.b + other.b,
-                           self.a + other.a);
+        *self = Color::new(
+            self.r + other.r,
+            self.g + other.g,
+            self.b + other.b,
+            self.a + other.a,
+        );
     }
 }
 

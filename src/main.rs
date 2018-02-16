@@ -2,9 +2,9 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
+extern crate cgmath;
 extern crate gl;
 extern crate glutin;
-extern crate cgmath;
 extern crate uuid;
 
 mod bounding_rect;
@@ -40,7 +40,9 @@ fn clear() {
 
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new().with_dimensions(800, 600).with_title("sdfperf");
+    let window = glutin::WindowBuilder::new()
+        .with_dimensions(800, 600)
+        .with_title("sdfperf");
     let context = glutin::ContextBuilder::new().with_multisampling(4);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
 
@@ -63,7 +65,7 @@ fn main() {
         curr: Vector2::zero(),
         last: Vector2::zero(),
         clicked: Vector2::zero(),
-        down: false
+        down: false,
     };
 
     loop {
@@ -76,7 +78,7 @@ fn main() {
                         current_size.x = w as f32;
                         current_size.y = h as f32;
                         gl_window.resize(w, h);
-                    },
+                    }
 
                     glutin::WindowEvent::MouseMoved { position, .. } => {
                         // Store the current mouse position.
@@ -88,39 +90,34 @@ fn main() {
                         mouse_info.curr *= current_zoom;
 
                         network.handle_interaction(&mouse_info);
-                    },
+                    }
 
-                    glutin::WindowEvent::MouseWheel {delta, .. } => {
+                    glutin::WindowEvent::MouseWheel { delta, .. } => {
                         if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
                             if line_y == 1.0 {
                                 current_zoom -= ZOOM_INCREMENT;
-                            }
-                            else {
+                            } else {
                                 current_zoom += ZOOM_INCREMENT;
                             }
                             renderer.zoom(current_zoom);
                         }
-                    },
+                    }
 
                     glutin::WindowEvent::MouseInput { state, .. } => {
-
                         if let glutin::ElementState::Pressed = state {
                             // Store the current mouse position.
                             mouse_info.clicked = mouse_info.curr;
                             mouse_info.down = true;
 
                             network.handle_interaction(&mouse_info);
-                        }
-                        else {
+                        } else {
                             mouse_info.down = false;
                         }
-                    },
+                    }
 
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         if let glutin::ElementState::Pressed = input.state {
-
                             if let Some(key) = input.virtual_keycode {
-
                                 // TODO: there seems to be an issue with the `shift` key on certain machines
                                 if input.modifiers.shift && key != glutin::VirtualKeyCode::LShift {
                                     let op_type = match key {
@@ -131,11 +128,16 @@ fn main() {
                                         glutin::VirtualKeyCode::I => OpType::Intersection,
                                         glutin::VirtualKeyCode::M => OpType::SmoothMinimum,
                                         glutin::VirtualKeyCode::R => OpType::Render,
-                                        _ => OpType::Sphere
+                                        _ => OpType::Sphere,
                                     };
-                                    network.add_op(op_type,mouse_info.curr - OPERATOR_SIZE * 0.5, OPERATOR_SIZE);
+                                    network.add_op(
+                                        op_type,
+                                        mouse_info.curr - OPERATOR_SIZE * 0.5,
+                                        OPERATOR_SIZE,
+                                    );
                                 }
-                                if let Some(glutin::VirtualKeyCode::Delete) = input.virtual_keycode {
+                                if let Some(glutin::VirtualKeyCode::Delete) = input.virtual_keycode
+                                {
                                     network.delete_selected();
                                 }
                             }
@@ -143,7 +145,7 @@ fn main() {
                     }
                     _ => (),
                 },
-                _ => ()
+                _ => (),
             }
         });
 
@@ -157,6 +159,8 @@ fn main() {
                 renderer.set_preview_program(program);
 
                 network.clean();
+            } else {
+                renderer.set_preview_program(None);
             }
         }
 
@@ -168,4 +172,3 @@ fn main() {
         gl_window.swap_buffers().unwrap();
     }
 }
-

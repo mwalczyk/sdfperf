@@ -1,40 +1,39 @@
 use std::cmp::max;
 
 pub trait Connection {
-    fn has_inputs(&self) -> bool { true }
-    fn has_outputs(&self) -> bool { false }
-    fn available_inputs(&self) -> usize { 1 }
+    fn has_inputs(&self) -> bool {
+        true
+    }
+    fn has_outputs(&self) -> bool {
+        false
+    }
+    fn available_inputs(&self) -> usize {
+        1
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Vertex<T> {
-    pub data: T
-}
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum Direction {
-    Forward,
-    Backward
+    pub data: T,
 }
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Edges<T> {
     pub inputs: Vec<usize>,
     pub outputs: Vec<usize>,
-    pub data: T
+    pub data: T,
 }
 
 pub struct Graph<V, E> {
     pub vertices: Vec<Vertex<V>>,
-    pub edges: Vec<Edges<E>>
+    pub edges: Vec<Edges<E>>,
 }
 
 impl<V, E> Graph<V, E> {
-
     pub fn new() -> Graph<V, E> {
         Graph {
             vertices: Vec::new(),
-            edges: Vec::new()
+            edges: Vec::new(),
         }
     }
 
@@ -55,14 +54,12 @@ impl<V, E> Graph<V, E> {
     }
 
     pub fn add_vertex(&mut self, data_vert: V, data_edge: E) {
-        self.vertices.push(Vertex {
-            data: data_vert
-        });
+        self.vertices.push(Vertex { data: data_vert });
 
         self.edges.push(Edges {
             inputs: Vec::new(),
             outputs: Vec::new(),
-            data: data_edge
+            data: data_edge,
         });
     }
 
@@ -76,16 +73,11 @@ impl<V, E> Graph<V, E> {
 
         // Prune edges.
         for edges in self.edges.iter_mut() {
-
             // Delete edges that started at the removed vertex.
-            edges.inputs.retain(|&index| {
-                index != i
-            });
+            edges.inputs.retain(|&index| index != i);
 
             // Delete edges that terminated at the removed vertex.
-            edges.outputs.retain(|&index| {
-                index != i
-            });
+            edges.outputs.retain(|&index| index != i);
 
             // Update any edges that were pointing to or from the
             // swapped vertex.
@@ -124,11 +116,10 @@ impl<V, E> Graph<V, E> {
     /// reaching a leaf node (i.e. an op with no other inputs).
     fn recurse(&self, root: usize, indices: &mut Vec<usize>, visited: &mut Vec<usize>) {
         for index in self.edges[root].inputs.iter() {
-            self.recurse( *index, indices, visited);
+            self.recurse(*index, indices, visited);
         }
 
         // Finally, push back the root index.
         indices.push(root);
     }
-
 }
