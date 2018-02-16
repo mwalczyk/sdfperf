@@ -1,4 +1,5 @@
 use bounding_rect::BoundingRect;
+use graph::Connected;
 use interaction::InteractionState;
 
 use cgmath::{Vector2, Vector3};
@@ -215,4 +216,24 @@ impl Op {
         self.aabb_slot_input.translate(offset);
         self.aabb_slot_output.translate(offset);
     }
+}
+
+impl Connected for Op {
+    fn has_inputs(&self) -> bool {
+        self.family.has_inputs()
+    }
+
+    fn has_outputs(&self) -> bool {
+        self.family.has_outputs()
+    }
+
+    fn get_input_capacity(&self) -> usize {
+        self.family.get_input_capacity()
+    }
+
+    fn on_connect(&mut self) {
+        println!("Added edge that includes: {}", self.name);
+    }
+
+    fn on_disconnect(&mut self) {}
 }

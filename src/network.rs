@@ -316,19 +316,8 @@ impl Network {
                     .inside_with_padding(&mouse_info.curr, 12.0)
                 {
                     vertex.data.state = InteractionState::ConnectDestination;
-
-                    // Only add the connection if:
-                    // 1) A source index was found
-                    // 1) The destination op actually accepts inputs
-                    // 2) The connection doesn't already exist
-                    // 3) The source and destination indices aren't the same
                     if let Some(src) = src {
-                        if vertex.data.family.has_inputs()
-                            && !self.graph.edges[src].outputs.contains(&index)
-                            && src != index
-                        {
-                            dst = Some(index);
-                        }
+                        dst = Some(index);
                     }
                 }
             }

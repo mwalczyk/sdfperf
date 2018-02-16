@@ -1,19 +1,15 @@
 use std::cmp::max;
 
-pub trait Connection {
-    fn has_inputs(&self) -> bool {
-        true
-    }
-    fn has_outputs(&self) -> bool {
-        false
-    }
-    fn available_inputs(&self) -> usize {
-        1
-    }
+pub trait Connected {
+    fn has_inputs(&self) -> bool;
+    fn has_outputs(&self) -> bool;
+    fn get_input_capacity(&self) -> usize;
+    fn on_connect(&mut self);
+    fn on_disconnect(&mut self);
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct Vertex<T> {
+pub struct Vertex<T: Connected> {
     pub data: T,
 }
 
@@ -24,12 +20,16 @@ pub struct Edges<T> {
     pub data: T,
 }
 
-pub struct Graph<V, E> {
+pub struct Graph<V: Connected, E> {
+    /// The vertices (nodes) in the graph
     pub vertices: Vec<Vertex<V>>,
+
+    /// A list of `Edges` structs, where each `Edges` corresponds
+    /// to the vertex with the same index in `vertices`
     pub edges: Vec<Edges<E>>,
 }
 
-impl<V, E> Graph<V, E> {
+impl<V: Connected, E> Graph<V, E> {
     pub fn new() -> Graph<V, E> {
         Graph {
             vertices: Vec::new(),
@@ -95,8 +95,15 @@ impl<V, E> Graph<V, E> {
     }
 
     pub fn add_edge(&mut self, a: usize, b: usize) {
-        self.edges[a].outputs.push(b);
-        self.edges[b].inputs.push(a);
+        if a != b && self.vertices[a].data.has_outputs() && self.vertices[b].data.has_inputs() {
+            self.vertices[a].data.on_connect();
+            self.vertices[b].data.on_connect();
+
+            self.edges[a].outputs.push(b);
+            self.edges[b].inputs.push(a);
+        } else {
+            println!("Connection failed");
+        }
     }
 
     /// Performs a post-order traversal of the graph, returning
