@@ -3,6 +3,7 @@ use std::cmp::max;
 pub trait Connected {
     fn has_inputs(&self) -> bool;
     fn has_outputs(&self) -> bool;
+    fn get_active_inputs_count(&self) -> usize;
     fn get_input_capacity(&self) -> usize;
     fn on_connect(&mut self);
     fn on_disconnect(&mut self);
@@ -73,14 +74,14 @@ impl<N: Connected, E> Graph<N, E> {
 
         // Prune edges.
         for edges in self.edges.iter_mut() {
-            // Delete edges that started at the removed Node.
+            // Delete edges that started at the removed node.
             edges.inputs.retain(|&index| index != i);
 
-            // Delete edges that terminated at the removed Node.
+            // Delete edges that terminated at the removed node.
             edges.outputs.retain(|&index| index != i);
 
             // Update any edges that were pointing to or from the
-            // swapped Node.
+            // swapped node.
             for index in edges.inputs.iter_mut() {
                 if *index == swapped_index {
                     *index = i;
@@ -94,8 +95,28 @@ impl<N: Connected, E> Graph<N, E> {
         }
     }
 
+    pub fn remove_edge(&mut self, a: usize, b: usize) {
+        let removed_a = self.edges[a].outputs.remove_item(&b);
+        let removed_b = self.edges[b].inputs.remove_item(&a);
+
+        // If both of the remove
+        if let (Some(_), Some(_)) = (removed_a, removed_b) {
+            self.nodes[a].data.on_disconnect();
+            self.nodes[b].data.on_disconnect();
+        }
+    }
+
     pub fn add_edge(&mut self, a: usize, b: usize) {
-        if a != b && self.nodes[a].data.has_outputs() && self.nodes[b].data.has_inputs() {
+        if a != b && self.nodes[a].data.has_outputs() && self.nodes[b].data.has_inputs()
+        {
+            // If node `b` has reached its input capacity, replace
+            // the edge connecting its last input with `b` with
+            // the new edge.
+            if self.nodes[b].data.get_active_inputs_count() >= self.nodes[b].data.get_input_capacity() {
+                let old = self.edges[b].inputs.pop().unwrap();
+                self.remove_edge(old, b);
+            }
+
             self.nodes[a].data.on_connect();
             self.nodes[b].data.on_connect();
 

@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 #![allow(unused_imports)]
 #![allow(unreachable_code)]
+#![feature(vec_remove_item)]
 extern crate cgmath;
 extern crate gl;
 extern crate glutin;

@@ -185,29 +185,6 @@ impl Op {
         }
     }
 
-    /// Returns the number of ops that are connected to this
-    /// op in the current graph
-    fn get_number_of_active_inputs(&self) -> usize {
-        self.active_inputs
-    }
-
-    /// Connects this op to `other`. Returns `true` if the
-    /// connection was successful and `false` otherwise.
-    ///
-    /// Connecting will fail if `other` has reached its
-    /// input capacity or this op does not have any
-    /// outputs.
-    pub fn connect_to(&mut self, other: &mut Op) -> bool {
-        // Make sure that this op's output slot is active and the
-        // other op's input slot isn't already at capacity.
-        if self.family.has_outputs()
-            && other.get_number_of_active_inputs() < other.family.get_input_capacity()
-        {
-            return true;
-        }
-        false
-    }
-
     /// Translates the op in the network editor by an amount
     /// `offset`. Internally, this translates each of the
     /// bounding rectangles that are owned by this op.
@@ -227,13 +204,20 @@ impl Connected for Op {
         self.family.has_outputs()
     }
 
+    fn get_active_inputs_count(&self) -> usize {
+        self.active_inputs
+    }
+
     fn get_input_capacity(&self) -> usize {
         self.family.get_input_capacity()
     }
 
     fn on_connect(&mut self) {
+        self.active_inputs += 1;
         println!("Added edge that includes: {}", self.name);
     }
 
-    fn on_disconnect(&mut self) {}
+    fn on_disconnect(&mut self) {
+        self.active_inputs -= 1;
+    }
 }
