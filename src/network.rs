@@ -97,9 +97,9 @@ impl Network {
                 }
             }
 
-            self.graph.remove_vertex(selected);
+            self.graph.remove_node(selected);
             self.selection = None;
-            println!("Number of vertices: {}", self.graph.vertices.len());
+            println!("Number of vertices: {}", self.graph.nodes.len());
             println!("Number of edge lists: {}", self.graph.edges.len());
         }
     }
@@ -108,7 +108,7 @@ impl Network {
     /// `screen_position` and dimensions `screen_size`.
     pub fn add_op(&mut self, family: OpType, position: Vector2<f32>, size: Vector2<f32>) {
         let op = Op::new(family, position, size);
-        self.graph.add_vertex(op, 0);
+        self.graph.add_node(op, 0);
     }
 
     /// Pick a draw color based on the current interaction state of this
@@ -158,8 +158,8 @@ impl Network {
 
     /// Draws all ops in the network.
     fn draw_all_ops(&mut self, renderer: &Renderer) {
-        for vertex in self.graph.get_vertices().iter() {
-            self.draw_op(&vertex.data, renderer);
+        for node in self.graph.get_nodes().iter() {
+            self.draw_op(&node.data, renderer);
         }
     }
 
@@ -169,11 +169,11 @@ impl Network {
 
         for (src, edges) in self.graph.edges.iter().enumerate() {
             for dst in edges.outputs.iter() {
-                let src_vert = self.graph.get_vertex(src).unwrap();
-                let dst_vert = self.graph.get_vertex(*dst).unwrap();
+                let src_node = self.graph.get_node(src).unwrap();
+                let dst_node = self.graph.get_node(*dst).unwrap();
 
-                let src_centroid = src_vert.data.aabb_slot_output.centroid();
-                let dst_centroid = dst_vert.data.aabb_slot_input.centroid();
+                let src_centroid = src_node.data.aabb_slot_output.centroid();
+                let dst_centroid = dst_node.data.aabb_slot_input.centroid();
 
                 // Push back the first point.
                 points.push(src_centroid.x);
@@ -205,18 +205,18 @@ impl Network {
     pub fn add_connection(&mut self, a: usize, b: usize) {
         self.graph.add_edge(a, b);
 
-        if let Pair::Both(vert_a, vert_b) = index_twice(&mut self.graph.vertices, a, b) {
+        if let Pair::Both(node_a, node_b) = index_twice(&mut self.graph.nodes, a, b) {
             // If we are connecting to a render op, then the shader
             // must be rebuilt.
-            if vert_b.data.family == OpType::Render {
+            if node_b.data.family == OpType::Render {
                 self.root = Some(b);
                 self.dirty = true;
                 println!("Connected to render node: building graph");
             }
 
             // Deselect both ops.
-            vert_a.data.state = InteractionState::Deselected;
-            vert_b.data.state = InteractionState::Deselected;
+            node_a.data.state = InteractionState::Deselected;
+            node_b.data.state = InteractionState::Deselected;
         } else {
             println!("Attempting to connect two ops with the same index - something is wrong here")
         }
@@ -227,8 +227,8 @@ impl Network {
         let mut src: Option<usize> = None;
         let mut dst: Option<usize> = None;
 
-        for (index, vertex) in self.graph.vertices.iter_mut().enumerate() {
-            if let InteractionState::ConnectSource = vertex.data.state {
+        for (index, node) in self.graph.nodes.iter_mut().enumerate() {
+            if let InteractionState::ConnectSource = node.data.state {
                 if mouse_info.down {
                     // If this operator is currently being connected to another:
                     // 1) Set the `connecting` flag to `true`, as the user is
@@ -240,19 +240,19 @@ impl Network {
                     continue;
                 } else {
                     // Otherwise, deselect this op
-                    vertex.data.state = InteractionState::Deselected;
+                    node.data.state = InteractionState::Deselected;
                 }
             }
 
             // Is the mouse inside of this op's bounding box?
-            if vertex.data.aabb_op.inside(&mouse_info.curr) {
+            if node.data.aabb_op.inside(&mouse_info.curr) {
                 // Is there an op currently selected?
                 if let Some(selected) = self.selection {
                     // Is this op the selected op?
                     if selected == index {
                         // Is the mouse down?
                         if mouse_info.down {
-                            vertex.data.translate(&(mouse_info.curr - mouse_info.last));
+                            node.data.translate(&(mouse_info.curr - mouse_info.last));
                         }
                         continue;
                     }
@@ -262,19 +262,18 @@ impl Network {
                 // bounding box. Is the mouse down?
                 if mouse_info.down {
                     // Are we inside the bounds of this op's output slot?
-                    if vertex
-                        .data
+                    if node.data
                         .aabb_slot_output
                         .inside_with_padding(&mouse_info.curr, 12.0)
                     {
                         // This op is now a potential connection source.
-                        vertex.data.state = InteractionState::ConnectSource;
+                        node.data.state = InteractionState::ConnectSource;
 
                         // Store the connection source index.
                         src = Some(index);
                     } else {
                         // This op has been selected.
-                        vertex.data.state = InteractionState::Selected;
+                        node.data.state = InteractionState::Selected;
 
                         // Store the selected UUID.
                         self.selection = Some(index);
@@ -282,7 +281,7 @@ impl Network {
                 } else {
                     // Otherwise, the mouse is still inside the bounds of this op,
                     // so we must be hovering over it.
-                    vertex.data.state = InteractionState::Hover;
+                    node.data.state = InteractionState::Hover;
                 }
 
             // The mouse is not inside of this op's bounding box.
@@ -292,14 +291,14 @@ impl Network {
                     // Is this op the selected op?
                     if selected == index {
                         // Keep this op selected.
-                        vertex.data.state = InteractionState::Selected;
+                        node.data.state = InteractionState::Selected;
                     } else {
                         // Deselect the op.
-                        vertex.data.state = InteractionState::Deselected;
+                        node.data.state = InteractionState::Deselected;
                     }
                 } else {
                     // Deselect the op.
-                    vertex.data.state = InteractionState::Deselected;
+                    node.data.state = InteractionState::Deselected;
                 }
             }
         }
@@ -308,14 +307,13 @@ impl Network {
         // check if a potential connection has happened (i.e. the mouse
         // is now over an input slot of a different operator).
         if connecting {
-            for (index, vertex) in self.graph.vertices.iter_mut().enumerate() {
+            for (index, node) in self.graph.nodes.iter_mut().enumerate() {
                 // Is the mouse now inside of a different op's input slot region?
-                if vertex
-                    .data
+                if node.data
                     .aabb_slot_input
                     .inside_with_padding(&mouse_info.curr, 12.0)
                 {
-                    vertex.data.state = InteractionState::ConnectDestination;
+                    node.data.state = InteractionState::ConnectDestination;
                     if let Some(src) = src {
                         dst = Some(index);
                     }

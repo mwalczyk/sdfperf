@@ -183,37 +183,36 @@ impl ShaderBuilder {
 
         // Build the `map` function by traversing the graph of ops.
         for index in indices {
-            if let Some(vertex) = network.graph.get_vertex(index) {
+            if let Some(node) = network.graph.get_node(index) {
                 // Append this op's line of shader code with a leading
                 // tab and trailing newline.
-                let mut formatted = match vertex.data.family {
-                    OpType::Sphere | OpType::Box | OpType::Plane => vertex
-                        .data
-                        .family
-                        .get_formatted(vec![vertex.data.name.clone()]),
+                let mut formatted = match node.data.family {
+                    OpType::Sphere | OpType::Box | OpType::Plane => {
+                        node.data.family.get_formatted(vec![node.data.name.clone()])
+                    }
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
                         let src_a = network.graph.edges[index].inputs[0];
                         let src_b = network.graph.edges[index].inputs[1];
-                        vertex.data.family.get_formatted(vec![
-                            vertex.data.name.clone(),                                   // This op's name
-                            network.graph.get_vertex(src_a).unwrap().data.name.clone(), // The name of this op's 1st input
-                            network.graph.get_vertex(src_b).unwrap().data.name.clone(), // The name of this op's 2nd input
+                        node.data.family.get_formatted(vec![
+                            node.data.name.clone(),                                   // This op's name
+                            network.graph.get_node(src_a).unwrap().data.name.clone(), // The name of this op's 1st input
+                            network.graph.get_node(src_b).unwrap().data.name.clone(), // The name of this op's 2nd input
                         ])
                     }
 
                     OpType::Render => {
                         let src = network.graph.edges[index].inputs[0];
-                        let name = network.graph.get_vertex(src).unwrap().data.name.clone();
-                        let mut code = vertex.data.family.get_formatted(vec![
-                            vertex.data.name.clone(), // This op's name
-                            name,                     // The input op's name
+                        let name = network.graph.get_node(src).unwrap().data.name.clone();
+                        let mut code = node.data.family.get_formatted(vec![
+                            node.data.name.clone(), // This op's name
+                            name,                   // The input op's name
                         ]);
 
                         // Add the final `return` in the `map(..)` function.
                         code.push('\n');
                         code.push('\t');
-                        code.push_str(&format!("return vec2(0.0, {});", &vertex.data.name[..])[..]);
+                        code.push_str(&format!("return vec2(0.0, {});", &node.data.name[..])[..]);
 
                         code
                     }

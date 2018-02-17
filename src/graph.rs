@@ -9,7 +9,7 @@ pub trait Connected {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct Vertex<T: Connected> {
+pub struct Node<T: Connected> {
     pub data: T,
 }
 
@@ -20,67 +20,67 @@ pub struct Edges<T> {
     pub data: T,
 }
 
-pub struct Graph<V: Connected, E> {
-    /// The vertices (nodes) in the graph
-    pub vertices: Vec<Vertex<V>>,
+pub struct Graph<N: Connected, E> {
+    /// The nodes (vertices) in the graph
+    pub nodes: Vec<Node<N>>,
 
     /// A list of `Edges` structs, where each `Edges` corresponds
-    /// to the vertex with the same index in `vertices`
+    /// to the node with the same index in `nodes`
     pub edges: Vec<Edges<E>>,
 }
 
-impl<V: Connected, E> Graph<V, E> {
-    pub fn new() -> Graph<V, E> {
+impl<N: Connected, E> Graph<N, E> {
+    pub fn new() -> Graph<N, E> {
         Graph {
-            vertices: Vec::new(),
+            nodes: Vec::new(),
             edges: Vec::new(),
         }
     }
 
-    pub fn get_vertex(&self, index: usize) -> Option<&Vertex<V>> {
-        self.vertices.get(index)
+    pub fn get_node(&self, index: usize) -> Option<&Node<N>> {
+        self.nodes.get(index)
     }
 
-    pub fn get_vertex_mut(&mut self, index: usize) -> Option<&mut Vertex<V>> {
-        self.vertices.get_mut(index)
+    pub fn get_node_mut(&mut self, index: usize) -> Option<&mut Node<N>> {
+        self.nodes.get_mut(index)
     }
 
-    pub fn get_vertices(&self) -> &Vec<Vertex<V>> {
-        &self.vertices
+    pub fn get_nodes(&self) -> &Vec<Node<N>> {
+        &self.nodes
     }
 
     pub fn get_edges(&self) -> &Vec<Edges<E>> {
         &self.edges
     }
 
-    pub fn add_vertex(&mut self, data_vert: V, data_edge: E) {
-        self.vertices.push(Vertex { data: data_vert });
+    pub fn add_node(&mut self, data_n: N, data_e: E) {
+        self.nodes.push(Node { data: data_n });
 
         self.edges.push(Edges {
             inputs: Vec::new(),
             outputs: Vec::new(),
-            data: data_edge,
+            data: data_e,
         });
     }
 
-    pub fn remove_vertex(&mut self, i: usize) {
-        // The (original) index of the last vertex, which
-        // will be swapped into the deleted vertex's place.
-        let swapped_index = self.vertices.len() - 1;
+    pub fn remove_node(&mut self, i: usize) {
+        // The (original) index of the last node, which
+        // will be swapped into the deleted node's place.
+        let swapped_index = self.nodes.len() - 1;
 
-        let removed_vertex = self.vertices.swap_remove(i);
+        let removed_vertex = self.nodes.swap_remove(i);
         let removed_edges = self.edges.swap_remove(i);
 
         // Prune edges.
         for edges in self.edges.iter_mut() {
-            // Delete edges that started at the removed vertex.
+            // Delete edges that started at the removed Node.
             edges.inputs.retain(|&index| index != i);
 
-            // Delete edges that terminated at the removed vertex.
+            // Delete edges that terminated at the removed Node.
             edges.outputs.retain(|&index| index != i);
 
             // Update any edges that were pointing to or from the
-            // swapped vertex.
+            // swapped Node.
             for index in edges.inputs.iter_mut() {
                 if *index == swapped_index {
                     *index = i;
@@ -95,9 +95,9 @@ impl<V: Connected, E> Graph<V, E> {
     }
 
     pub fn add_edge(&mut self, a: usize, b: usize) {
-        if a != b && self.vertices[a].data.has_outputs() && self.vertices[b].data.has_inputs() {
-            self.vertices[a].data.on_connect();
-            self.vertices[b].data.on_connect();
+        if a != b && self.nodes[a].data.has_outputs() && self.nodes[b].data.has_inputs() {
+            self.nodes[a].data.on_connect();
+            self.nodes[b].data.on_connect();
 
             self.edges[a].outputs.push(b);
             self.edges[b].inputs.push(a);
@@ -107,7 +107,7 @@ impl<V: Connected, E> Graph<V, E> {
     }
 
     /// Performs a post-order traversal of the graph, returning
-    /// the vertex indices in the proper order.
+    /// the node indices in the proper order.
     pub fn traverse(&mut self, root: usize) -> Vec<usize> {
         let mut indices = Vec::new();
         let mut visited = Vec::new();
