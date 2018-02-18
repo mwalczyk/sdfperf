@@ -227,14 +227,14 @@ impl Network {
         }
     }
 
-    pub fn handle_interaction(&mut self, mouse_info: &MouseInfo) {
+    pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
         let mut connecting = false;
         let mut src: Option<usize> = None;
         let mut dst: Option<usize> = None;
 
         for (index, node) in self.graph.nodes.iter_mut().enumerate() {
             if let InteractionState::ConnectSource = node.data.state {
-                if mouse_info.down {
+                if mouse.down {
                     // If this operator is currently being connected to another:
                     // 1) Set the `connecting` flag to `true`, as the user is
                     //    performing a potential op connection
@@ -250,14 +250,14 @@ impl Network {
             }
 
             // Is the mouse inside of this op's bounding box?
-            if node.data.aabb_op.inside(&mouse_info.curr) {
+            if node.data.aabb_op.inside(&mouse.curr) {
                 // Is there an op currently selected?
                 if let Some(selected) = self.selection {
                     // Is this op the selected op?
                     if selected == index {
                         // Is the mouse down?
-                        if mouse_info.down {
-                            node.data.translate(&(mouse_info.curr - mouse_info.last));
+                        if mouse.down {
+                            node.data.translate(&(mouse.curr - mouse.last));
                         }
                         continue;
                     }
@@ -265,11 +265,11 @@ impl Network {
 
                 // This op is not the selected op, but we are inside of it's
                 // bounding box. Is the mouse down?
-                if mouse_info.down {
+                if mouse.down {
                     // Are we inside the bounds of this op's output slot?
                     if node.data
                         .aabb_slot_output
-                        .inside_with_padding(&mouse_info.curr, 12.0)
+                        .inside_with_padding(&mouse.curr, 12.0)
                     {
                         // This op is now a potential connection source.
                         node.data.state = InteractionState::ConnectSource;
@@ -316,7 +316,7 @@ impl Network {
                 // Is the mouse now inside of a different op's input slot region?
                 if node.data
                     .aabb_slot_input
-                    .inside_with_padding(&mouse_info.curr, 12.0)
+                    .inside_with_padding(&mouse.curr, 12.0)
                 {
                     node.data.state = InteractionState::ConnectDestination;
                     if let Some(src) = src {
@@ -329,5 +329,7 @@ impl Network {
         if let (Some(src), Some(dst)) = (src, dst) {
             self.add_connection(src, dst);
         }
+
+        self.preview.handle_interaction(&mouse);
     }
 }

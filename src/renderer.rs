@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime};
 
 pub enum DrawMode {
     Fill,
-    Stroke
+    Stroke,
 }
 
 pub struct Renderer {
@@ -111,8 +111,7 @@ impl Renderer {
         }";
 
         // Compile the shader program.
-        let program_draw =
-            Program::new(DRAW_VS_SRC.to_string(), DRAW_FS_SRC.to_string()).unwrap();
+        let program_draw = Program::new(DRAW_VS_SRC.to_string(), DRAW_FS_SRC.to_string()).unwrap();
 
         // Setup buffers.
         let mut vao = 0;
@@ -239,7 +238,6 @@ impl Renderer {
     pub fn conditionally_bind(&mut self, id: GLuint) -> bool {
         // Is there currently a bound program?
         if let Some(bound_id) = self.bound_program {
-
             // Is the bound program's handle different than
             // the program in question?
             if bound_id != id {

@@ -1,9 +1,18 @@
-use cgmath::{Matrix4, SquareMatrix, Vector2};
+use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 
 use bounding_rect::BoundingRect;
+use color::Color;
 use interaction::MouseInfo;
 use program::Program;
 use renderer::Renderer;
+
+#[derive(Copy, Clone)]
+pub enum Shading {
+    // TODO: eventually, these could be structs with memebers like `color`
+    Diffuse,
+    Constant,
+    Normals,
+}
 
 pub struct Preview {
     program_valid: Option<Program>,
@@ -12,7 +21,9 @@ pub struct Preview {
 
     aabb: BoundingRect,
 
-    lookat: Matrix4<f32>,
+    look_at: Matrix4<f32>,
+
+    shading: Shading,
 }
 
 impl Preview {
@@ -57,7 +68,12 @@ impl Preview {
             program_valid: None,
             program_error,
             aabb: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
-            lookat: Matrix4::identity(),
+            look_at: Matrix4::look_at(
+                Point3::new(0.0, 0.0, -10.0),
+                Point3::new(0.0, 0.0, 0.0),
+                Vector3::unit_y(),
+            ),
+            shading: Shading::Normals,
         }
     }
 
@@ -72,8 +88,13 @@ impl Preview {
         self.program_valid = program;
     }
 
-    pub fn handle_interaction(&self, mouse: &MouseInfo) {
-        // Sets lookat matrix based on mouse events
+    pub fn set_shading(&mut self, shading: Shading) {
+        self.shading = shading;
+    }
+
+    pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
+        // Rebuilds the look-at matrix based on mouse events
+        if self.aabb.inside(&mouse.curr) {}
     }
 
     /// If a preview program has be assigned, render a miniature
@@ -81,6 +102,10 @@ impl Preview {
     /// network.
     pub fn draw(&self, renderer: &Renderer) {
         if let Some(ref program) = self.program_valid {
+            // Set the look-at matrix that will be used to construct
+            // the virtual camera.
+            program.uniform_matrix_4f("u_look_at_matrix", &self.look_at);
+            program.uniform_1ui("u_shading", self.shading as u32);
             renderer.draw_rect_with_program(&self.aabb, program);
         } else {
             renderer.draw_rect_with_program(&self.aabb, &self.program_error);

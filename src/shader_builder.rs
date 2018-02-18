@@ -42,6 +42,9 @@ impl ShaderBuilder {
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
 
+        uniform mat4 u_look_at_matrix;
+        uniform uint u_shading;
+
         const uint MAX_STEPS = 128u;
         const float MAX_TRACE_DISTANCE = 32.0;
         const float MIN_HIT_DISTANCE = 0.0001;
@@ -52,6 +55,8 @@ impl ShaderBuilder {
             vec3 d;
         };
 
+        // This will typically be provided by the application,
+        // but we leave this function here just in case.
         mat3 lookat(in vec3 t, in vec3 p)
         {
             vec3 k = normalize(t - p);
@@ -140,12 +145,38 @@ impl ShaderBuilder {
             return vec2(current_id, current_total_distance);
         }
 
+        const uint SHADING_CONSTANT = 0;
+        const uint SHADING_DIFFUSE = 1;
+        const uint SHADING_NORMALS = 2;
+        vec3 shading(in vec3 hit)
+        {
+            if (u_shading == 0)
+            {
+                return vec3(1.0);
+            }
+            else
+            {
+                // calculate normals
+                vec3 n = calculate_normal(hit);
+                if (u_shading == SHADING_DIFFUSE)
+                {
+                    const vec3 l = normalize(vec3(1.0, 5.0, 0.0));
+                    float d = max(0.0, dot(n, l));
+                    return vec3(d);
+                }
+                else
+                {
+                    return n * 0.5 + 0.5;
+                }
+            }
+        }
+
         void main()
         {
             vec2 uv = vs_texcoord * 2.0 - 1.0;
-            vec3 camera_position = vec3(0.0, 10.0, 10.0);
+            vec3 camera_position = vec3(0.0, 0.0, 10.0);
 
-            mat3 lookat = lookat(vec3(0.0), camera_position);
+            mat3 lookat = mat3(u_look_at_matrix);
             vec3 ro = camera_position;
             vec3 rd = normalize(lookat * vec3(uv.xy, 1.0));
             ray r = ray(ro, rd);
@@ -158,10 +189,7 @@ impl ShaderBuilder {
             switch(int(res.x))
             {
                 case 0:
-                    vec3 n = calculate_normal(hit);
-                    vec3 l = normalize(vec3(1.0, 5.0, 0.0));
-                    float d = max(0.0, dot(n, l));
-                    color = vec3(d); //n * 0.5 + 0.5;
+                    color = shading(hit);
                     break;
                 case 1:
                     // Placeholder

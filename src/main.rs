@@ -24,6 +24,7 @@ use color::Color;
 use interaction::MouseInfo;
 use operator::{Op, OpType};
 use network::Network;
+use preview::Shading;
 use program::Program;
 use renderer::Renderer;
 use shader_builder::ShaderBuilder;
@@ -119,8 +120,8 @@ fn main() {
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         if let glutin::ElementState::Pressed = input.state {
                             if let Some(key) = input.virtual_keycode {
-                                // TODO: there seems to be an issue with the `shift` key on certain machines
                                 if input.modifiers.shift && key != glutin::VirtualKeyCode::LShift {
+                                    // If the `shift` modifier is down, add a new op.
                                     let op_type = match key {
                                         glutin::VirtualKeyCode::S => OpType::Sphere,
                                         glutin::VirtualKeyCode::B => OpType::Box,
@@ -136,10 +137,15 @@ fn main() {
                                         mouse_info.curr - OPERATOR_SIZE * 0.5,
                                         OPERATOR_SIZE,
                                     );
-                                }
-                                if let Some(glutin::VirtualKeyCode::Delete) = input.virtual_keycode
-                                {
-                                    network.delete_selected();
+                                } else {
+                                    // Handle other key commands.
+                                    match key {
+                                        glutin::VirtualKeyCode::Delete => network.delete_selected(),
+                                        glutin::VirtualKeyCode::Key1 => network.preview.set_shading(Shading::Diffuse),
+                                        glutin::VirtualKeyCode::Key2 => network.preview.set_shading(Shading::Constant),
+                                        glutin::VirtualKeyCode::Key3 => network.preview.set_shading(Shading::Normals),
+                                        _ => ()
+                                    }
                                 }
                             }
                         }

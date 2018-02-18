@@ -20,9 +20,9 @@ pub struct Program {
 }
 
 impl Program {
+    /// Compiles a shader of type `ty` from the source held in `src`.
     fn compile_shader(src: &String, ty: GLenum) -> Result<GLuint, String> {
         let shader;
-
         unsafe {
             shader = gl::CreateShader(ty);
 

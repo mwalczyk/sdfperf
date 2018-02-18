@@ -21,6 +21,7 @@ pub enum InteractionState {
     Hover,
     ConnectSource,
     ConnectDestination,
+    // TODO: change these to `DragFrom` and `DragTo` or `Drag` and `Drop`
 }
 
 /// A trait that represents a view or region that the
