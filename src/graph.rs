@@ -107,12 +107,13 @@ impl<N: Connected, E> Graph<N, E> {
     }
 
     pub fn add_edge(&mut self, a: usize, b: usize) {
-        if a != b && self.nodes[a].data.has_outputs() && self.nodes[b].data.has_inputs()
-        {
+        if a != b && self.nodes[a].data.has_outputs() && self.nodes[b].data.has_inputs() {
             // If node `b` has reached its input capacity, replace
             // the edge connecting its last input with `b` with
             // the new edge.
-            if self.nodes[b].data.get_active_inputs_count() >= self.nodes[b].data.get_input_capacity() {
+            if self.nodes[b].data.get_active_inputs_count()
+                >= self.nodes[b].data.get_input_capacity()
+            {
                 let old = self.edges[b].inputs.pop().unwrap();
                 self.remove_edge(old, b);
             }

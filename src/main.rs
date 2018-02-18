@@ -157,18 +157,15 @@ fn main() {
             if let Some(root) = network.root {
                 let indices = network.graph.traverse(root);
                 let program = builder.build_sources(&network, indices);
-                renderer.set_preview_program(program);
-
+                network.preview.set_valid_program(program);
                 network.clean();
             } else {
-                renderer.set_preview_program(None);
+                network.preview.set_valid_program(None);
             }
         }
 
-        // Draw the graph (ops, connections, etc.).
+        // Draw the graph (ops, connections, preview window, etc.).
         network.draw(&renderer);
-
-        renderer.draw_preview();
 
         gl_window.swap_buffers().unwrap();
     }

@@ -5,6 +5,7 @@ use color::Color;
 use graph::Graph;
 use interaction::{InteractionState, MouseInfo};
 use operator::{Op, OpType};
+use preview::Preview;
 use renderer::Renderer;
 
 use std::cmp::max;
@@ -31,6 +32,8 @@ pub struct Network {
 
     /// The index of the root op (if there is one)
     pub root: Option<usize>,
+
+    pub preview: Preview,
 
     /// A flag that control whether or not the shader graph
     /// needs to be rebuilt
@@ -66,6 +69,7 @@ impl Network {
             graph: Graph::new(),
             selection: None,
             root: None,
+            preview: Preview::new(),
             dirty: false,
         }
     }
@@ -199,6 +203,7 @@ impl Network {
     pub fn draw(&mut self, renderer: &Renderer) {
         self.draw_all_edges(renderer);
         self.draw_all_ops(renderer);
+        self.preview.draw(renderer);
     }
 
     /// Adds a new connection between two ops.

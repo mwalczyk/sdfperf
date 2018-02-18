@@ -1,4 +1,4 @@
-use cgmath::Matrix4;
+use cgmath::{Matrix4, SquareMatrix, Vector2};
 
 use bounding_rect::BoundingRect;
 use interaction::MouseInfo;
@@ -6,9 +6,9 @@ use program::Program;
 use renderer::Renderer;
 
 pub struct Preview {
-    valid_program: Option<Program>,
+    program_valid: Option<Program>,
 
-    fallback_program: Program,
+    program_error: Program,
 
     aabb: BoundingRect,
 
@@ -16,7 +16,7 @@ pub struct Preview {
 }
 
 impl Preview {
-    pub fn new() {
+    pub fn new() -> Preview {
         static FALLBACK_VS_SRC: &'static str = "
         #version 430
 
@@ -50,15 +50,40 @@ impl Preview {
             o_color = vec4(vec3(checkerboard), 1.0);;
         }";
 
-        let fallback_program =
+        let program_error =
             Program::new(FALLBACK_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
+
+        Preview {
+            program_valid: None,
+            program_error,
+            aabb: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
+            lookat: Matrix4::identity(),
+        }
+    }
+
+    /// Sets the shader program that will be used to render a
+    /// miniature preview window in the lower right-hand corner
+    /// of the network.
+    ///
+    /// If `program` is `None`, then the renderer will use a
+    /// fall-back shader to indicate the error state of the
+    /// current graph.
+    pub fn set_valid_program(&mut self, program: Option<Program>) {
+        self.program_valid = program;
     }
 
     pub fn handle_interaction(&self, mouse: &MouseInfo) {
         // Sets lookat matrix based on mouse events
     }
 
+    /// If a preview program has be assigned, render a miniature
+    /// preview window in the lower right-hand corner of the
+    /// network.
     pub fn draw(&self, renderer: &Renderer) {
-        if let Some(ref program) = self.valid_program {}
+        if let Some(ref program) = self.program_valid {
+            renderer.draw_rect_with_program(&self.aabb, program);
+        } else {
+            renderer.draw_rect_with_program(&self.aabb, &self.program_error);
+        }
     }
 }

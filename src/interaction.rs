@@ -30,4 +30,5 @@ trait Panel {
     fn mouse_release(&self);
     fn mouse_entered(&self);
     fn mouse_exited(&self);
+    fn handle_interaction(&mut self, info: &MouseInfo);
 }

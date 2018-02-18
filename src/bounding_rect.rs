@@ -1,4 +1,4 @@
-use cgmath::{Matrix, Matrix4, Vector2, Vector3};
+use cgmath::{Matrix, Matrix4, SquareMatrix, Vector2, Vector3};
 
 pub enum Edge {
     Left,
@@ -9,13 +9,21 @@ pub enum Edge {
 
 #[derive(PartialEq)]
 pub struct BoundingRect {
-    pub upper_left: Vector2<f32>,
-    pub size: Vector2<f32>,
+    upper_left: Vector2<f32>,
+    size: Vector2<f32>,
+    model_matrix: Matrix4<f32>,
 }
 
 impl BoundingRect {
     pub fn new(upper_left: Vector2<f32>, size: Vector2<f32>) -> BoundingRect {
-        BoundingRect { upper_left, size }
+        let mut rect = BoundingRect {
+            upper_left,
+            size,
+            model_matrix: Matrix4::identity(),
+        };
+
+        rect.rebuild_model_matrix();
+        rect
     }
 
     pub fn expand_from_center(&self, delta: &Vector2<f32>) -> BoundingRect {
@@ -24,14 +32,17 @@ impl BoundingRect {
 
     pub fn translate(&mut self, offset: &Vector2<f32>) {
         self.upper_left += *offset;
+        self.rebuild_model_matrix();
     }
 
     pub fn set_upper_left(&mut self, to: &Vector2<f32>) {
         self.upper_left = *to;
+        self.rebuild_model_matrix();
     }
 
     pub fn set_size(&mut self, to: &Vector2<f32>) {
         self.size = *to;
+        self.rebuild_model_matrix();
     }
 
     pub fn inside(&self, point: &Vector2<f32>) -> bool {
@@ -61,11 +72,18 @@ impl BoundingRect {
         )
     }
 
-    pub fn get_model_matrix(&self) -> Matrix4<f32> {
+    pub fn get_model_matrix(&self) -> &Matrix4<f32> {
+        &self.model_matrix
+    }
+
+    /// Caches a 4x4 model matrix that describes this bounding
+    /// rectangle. This will be rebuilt any time the bounding
+    /// rectangle changes size or location.
+    fn rebuild_model_matrix(&mut self) {
         let translation =
             Matrix4::from_translation(Vector3::new(self.upper_left.x, self.upper_left.y, 0.0));
         let scale = Matrix4::from_nonuniform_scale(self.size.x, self.size.y, 0.0);
 
-        translation * scale
+        self.model_matrix = translation * scale;
     }
 }
