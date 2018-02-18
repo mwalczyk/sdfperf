@@ -43,6 +43,7 @@ impl ShaderBuilder {
         layout (location = 0) out vec4 o_color;
 
         uniform mat4 u_look_at_matrix;
+        uniform vec3 u_camera_position;
         uniform uint u_shading;
 
         const uint MAX_STEPS = 128u;
@@ -174,11 +175,10 @@ impl ShaderBuilder {
         void main()
         {
             vec2 uv = vs_texcoord * 2.0 - 1.0;
-            vec3 camera_position = vec3(0.0, 0.0, 10.0);
 
             mat3 lookat = mat3(u_look_at_matrix);
-            vec3 ro = camera_position;
-            vec3 rd = normalize(lookat * vec3(uv.xy, 1.0));
+            vec3 ro = u_camera_position;
+            vec3 rd = normalize(lookat * vec3(uv.xy, -1.0));
             ray r = ray(ro, rd);
 
             vec2 res = raymarch(r);

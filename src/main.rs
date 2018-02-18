@@ -57,9 +57,8 @@ fn main() {
     let mut builder = ShaderBuilder::new();
 
     // Constants
-    const ZOOM_INCREMENT: f32 = 0.05;
+    const ZOOM_INCREMENT: f32 = 0.1;
     const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
-    let mut current_zoom = 1.0;
     let mut current_size = Vector2::new(800.0, 600.0);
 
     // Store interaction state
@@ -68,6 +67,7 @@ fn main() {
         last: Vector2::zero(),
         clicked: Vector2::zero(),
         down: false,
+        scroll: 1.0
     };
 
     loop {
@@ -89,19 +89,20 @@ fn main() {
 
                         // Zero center and zoom.
                         mouse_info.curr -= current_size * 0.5;
-                        mouse_info.curr *= current_zoom;
-
+                        // TODO: mouse_info.curr *= mouse_info.scroll;
                         network.handle_interaction(&mouse_info);
                     }
 
                     glutin::WindowEvent::MouseWheel { delta, .. } => {
                         if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
                             if line_y == 1.0 {
-                                current_zoom -= ZOOM_INCREMENT;
+                                mouse_info.scroll -= ZOOM_INCREMENT;
                             } else {
-                                current_zoom += ZOOM_INCREMENT;
+                                mouse_info.scroll += ZOOM_INCREMENT;
                             }
-                            renderer.zoom(current_zoom);
+
+                            // TODO: renderer.zoom(mouse_info.scroll);
+                            network.handle_interaction(&mouse_info);
                         }
                     }
 
@@ -141,10 +142,16 @@ fn main() {
                                     // Handle other key commands.
                                     match key {
                                         glutin::VirtualKeyCode::Delete => network.delete_selected(),
-                                        glutin::VirtualKeyCode::Key1 => network.preview.set_shading(Shading::Diffuse),
-                                        glutin::VirtualKeyCode::Key2 => network.preview.set_shading(Shading::Constant),
-                                        glutin::VirtualKeyCode::Key3 => network.preview.set_shading(Shading::Normals),
-                                        _ => ()
+                                        glutin::VirtualKeyCode::Key1 => {
+                                            network.preview.set_shading(Shading::Diffuse)
+                                        }
+                                        glutin::VirtualKeyCode::Key2 => {
+                                            network.preview.set_shading(Shading::Constant)
+                                        }
+                                        glutin::VirtualKeyCode::Key3 => {
+                                            network.preview.set_shading(Shading::Normals)
+                                        }
+                                        _ => (),
                                     }
                                 }
                             }

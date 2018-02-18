@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero, EuclideanSpace};
 
 use bounding_rect::BoundingRect;
 use color::Color;
@@ -22,6 +22,12 @@ pub struct Preview {
     aabb: BoundingRect,
 
     look_at: Matrix4<f32>,
+
+    camera_position: Point3<f32>,
+
+    yaw: f32,
+
+    pitch: f32,
 
     shading: Shading,
 }
@@ -69,10 +75,13 @@ impl Preview {
             program_error,
             aabb: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
             look_at: Matrix4::look_at(
-                Point3::new(0.0, 0.0, -10.0),
+                Point3::new(0.0, 0.0, 10.0),
                 Point3::new(0.0, 0.0, 0.0),
                 Vector3::unit_y(),
             ),
+            camera_position: Point3::new(0.0, 0.0, 10.0),
+            yaw: -90.0,
+            pitch: 0.0,
             shading: Shading::Normals,
         }
     }
@@ -94,17 +103,49 @@ impl Preview {
 
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
         // Rebuilds the look-at matrix based on mouse events
-        if self.aabb.inside(&mouse.curr) {}
+        if self.aabb.inside(&mouse.curr) {
+            let mut front = Vector3::zero();
+            if mouse.down {
+                let mut offset = mouse.curr - mouse.last;
+                const SENSITIVITY: f32 = 0.25;
+                offset *= SENSITIVITY;
+
+                self.yaw += offset.x;
+                self.pitch += offset.y;
+
+                if self.pitch > 89.0 {
+                    self.pitch = 89.0;
+                }
+
+                if self.pitch < -89.0 {
+                    self.pitch = -89.0;
+                }
+            }
+
+            front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
+            front.y = self.pitch.to_radians().sin();
+            front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
+            front.normalize();
+
+            self.camera_position.z = 10.0 * mouse.scroll;
+            self.look_at = Matrix4::look_at(
+                self.camera_position,
+                self.camera_position + front,
+                Vector3::unit_y(),
+            );
+        }
     }
 
     /// If a preview program has be assigned, render a miniature
     /// preview window in the lower right-hand corner of the
     /// network.
     pub fn draw(&self, renderer: &Renderer) {
+
         if let Some(ref program) = self.program_valid {
             // Set the look-at matrix that will be used to construct
             // the virtual camera.
             program.uniform_matrix_4f("u_look_at_matrix", &self.look_at);
+            program.uniform_3f("u_camera_position", &self.camera_position.to_vec());
             program.uniform_1ui("u_shading", self.shading as u32);
             renderer.draw_rect_with_program(&self.aabb, program);
         } else {

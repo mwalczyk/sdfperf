@@ -13,6 +13,9 @@ pub struct MouseInfo {
     /// A flag denoting whether or not the mouse is
     /// currently pressed
     pub down: bool,
+
+    /// The scroll status of the mouse
+    pub scroll: f32
 }
 
 pub enum InteractionState {
