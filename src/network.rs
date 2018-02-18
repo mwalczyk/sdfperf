@@ -33,11 +33,17 @@ pub struct Network {
     /// The index of the root op (if there is one)
     pub root: Option<usize>,
 
+    /// The preview of the shader that is represented by the
+    /// current network
     pub preview: Preview,
 
-    /// A flag that control whether or not the shader graph
+    /// A flag that controls whether or not the shader graph
     /// needs to be rebuilt
     dirty: bool,
+
+    /// A flag that controls whether or not the preview will
+    /// be drawn
+    show_preview: bool
 }
 
 enum Pair<T> {
@@ -71,6 +77,7 @@ impl Network {
             root: None,
             preview: Preview::new(),
             dirty: false,
+            show_preview: true
         }
     }
 
@@ -85,6 +92,12 @@ impl Network {
         self.dirty = false;
     }
 
+    /// Toggles drawing of the preview window.
+    pub fn toggle_preview(&mut self) {
+        self.show_preview = !self.show_preview;
+    }
+
+    /// Deletes the currently selected op (if the selection is not empty).
     pub fn delete_selected(&mut self) {
         if let Some(selected) = self.selection {
             // Before removing this vertex from the graph,
@@ -203,7 +216,10 @@ impl Network {
     pub fn draw(&mut self, renderer: &Renderer) {
         self.draw_all_edges(renderer);
         self.draw_all_ops(renderer);
-        self.preview.draw(renderer);
+
+        if self.show_preview {
+            self.preview.draw(renderer);
+        }
     }
 
     /// Adds a new connection between two ops.

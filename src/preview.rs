@@ -101,8 +101,13 @@ impl Preview {
         self.shading = shading;
     }
 
+    pub fn home(&mut self) {
+        self.yaw = -90.0;
+        self.pitch = 0.0;
+    }
+
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
-        // Rebuilds the look-at matrix based on mouse events
+        // Rebuilds the look-at matrix based on mouse events.
         if self.aabb.inside(&mouse.curr) {
             let mut front = Vector3::zero();
             if mouse.down {

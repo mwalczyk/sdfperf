@@ -47,7 +47,6 @@ fn main() {
         .with_title("sdfperf");
     let context = glutin::ContextBuilder::new().with_multisampling(4);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
-
     unsafe { gl_window.make_current() }.unwrap();
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
 
@@ -57,12 +56,12 @@ fn main() {
     let mut builder = ShaderBuilder::new();
 
     // Constants
-    const ZOOM_INCREMENT: f32 = 0.1;
+    const ZOOM_INCREMENT: f32 = 0.05;
     const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
     let mut current_size = Vector2::new(800.0, 600.0);
 
     // Store interaction state
-    let mut mouse_info = MouseInfo {
+    let mut mouse = MouseInfo {
         curr: Vector2::zero(),
         last: Vector2::zero(),
         clicked: Vector2::zero(),
@@ -84,37 +83,37 @@ fn main() {
 
                     glutin::WindowEvent::MouseMoved { position, .. } => {
                         // Store the current mouse position.
-                        mouse_info.last = mouse_info.curr;
-                        mouse_info.curr = Vector2::new(position.0 as f32, position.1 as f32);
+                        mouse.last = mouse.curr;
+                        mouse.curr = Vector2::new(position.0 as f32, position.1 as f32);
 
                         // Zero center and zoom.
-                        mouse_info.curr -= current_size * 0.5;
-                        // TODO: mouse_info.curr *= mouse_info.scroll;
-                        network.handle_interaction(&mouse_info);
+                        mouse.curr -= current_size * 0.5;
+                        // TODO: mouse.curr *= mouse.scroll;
+
+                        network.handle_interaction(&mouse);
                     }
 
                     glutin::WindowEvent::MouseWheel { delta, .. } => {
                         if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
                             if line_y == 1.0 {
-                                mouse_info.scroll -= ZOOM_INCREMENT;
+                                mouse.scroll -= ZOOM_INCREMENT;
                             } else {
-                                mouse_info.scroll += ZOOM_INCREMENT;
+                                mouse.scroll += ZOOM_INCREMENT;
                             }
 
-                            // TODO: renderer.zoom(mouse_info.scroll);
-                            network.handle_interaction(&mouse_info);
+                            // TODO: renderer.zoom(mouse.scroll);
+                            network.handle_interaction(&mouse);
                         }
                     }
 
                     glutin::WindowEvent::MouseInput { state, .. } => {
                         if let glutin::ElementState::Pressed = state {
                             // Store the current mouse position.
-                            mouse_info.clicked = mouse_info.curr;
-                            mouse_info.down = true;
-
-                            network.handle_interaction(&mouse_info);
+                            mouse.clicked = mouse.curr;
+                            mouse.down = true;
+                            network.handle_interaction(&mouse);
                         } else {
-                            mouse_info.down = false;
+                            mouse.down = false;
                         }
                     }
 
@@ -135,13 +134,18 @@ fn main() {
                                     };
                                     network.add_op(
                                         op_type,
-                                        mouse_info.curr - OPERATOR_SIZE * 0.5,
+                                        mouse.curr - OPERATOR_SIZE * 0.5,
                                         OPERATOR_SIZE,
                                     );
                                 } else {
                                     // Handle other key commands.
                                     match key {
                                         glutin::VirtualKeyCode::Delete => network.delete_selected(),
+                                        glutin::VirtualKeyCode::H => {
+                                            mouse.scroll = 1.0;
+                                            network.preview.home();
+                                        },
+                                        glutin::VirtualKeyCode::P => network.toggle_preview(),
                                         glutin::VirtualKeyCode::Key1 => {
                                             network.preview.set_shading(Shading::Diffuse)
                                         }
