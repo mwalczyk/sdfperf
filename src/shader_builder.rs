@@ -220,6 +220,12 @@ impl ShaderBuilder {
                     }
 
                     OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
+                        // If this operator doesn't have at least 2 inputs,
+                        // then we exit early, since this isn't a valid
+                        // shader graph.
+                        if network.graph.edges[index].inputs.len() < 2 {
+                            return None;
+                        }
                         let src_a = network.graph.edges[index].inputs[0];
                         let src_b = network.graph.edges[index].inputs[1];
                         node.data.family.get_formatted(vec![

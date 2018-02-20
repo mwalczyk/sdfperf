@@ -38,6 +38,10 @@ impl MouseInfo {
             scroll: 1.0,
         }
     }
+
+    pub fn velocity(&self) -> Vector2<f32> {
+        self.curr - self.last
+    }
 }
 pub enum InteractionState {
     Deselected,

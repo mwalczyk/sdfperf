@@ -12,9 +12,10 @@ use std::os::raw::c_void;
 use std::ffi::CString;
 use std::time::{Duration, SystemTime};
 
-pub enum DrawMode {
-    Fill,
-    Stroke,
+pub enum Alpha {
+    One,
+    Dashed,
+    Constant(f32)
 }
 
 pub struct Renderer {
@@ -133,7 +134,7 @@ impl Renderer {
             );
 
             // Create the VBO for rendering lines.
-            let vbo_line_size = (200 * mem::size_of::<GLfloat>()) as GLsizeiptr;
+            let vbo_line_size = (1000 * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::CreateBuffers(1, &mut vbo_line);
             gl::NamedBufferStorage(
                 vbo_line,
@@ -206,6 +207,10 @@ impl Renderer {
         renderer.zoom(1.0);
 
         renderer
+    }
+
+    pub fn get_resolution(&self) -> &Vector2<f32> {
+        &self.network_resolution
     }
 
     /// Zooms the network in or out by modifying the underlying
@@ -309,7 +314,7 @@ impl Renderer {
     }
 
     /// Draws a series of line segments.
-    pub fn draw_line(&self, data: &Vec<f32>, color: &Color) {
+    pub fn draw_lines(&self, data: &Vec<f32>, color: &Color, dashed: bool) {
         self.program_draw.bind();
 
         // First, set all relevant uniforms.
@@ -320,7 +325,7 @@ impl Renderer {
             .uniform_matrix_4f("u_projection_matrix", &self.projection);
         self.program_draw
             .uniform_4f("u_draw_color", &(*color).into());
-        self.program_draw.uniform_1ui("u_draw_mode", 1);
+        self.program_draw.uniform_1ui("u_draw_mode", dashed as u32);
         self.program_draw
             .uniform_1f("u_time", self.get_elapsed_seconds());
 

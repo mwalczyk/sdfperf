@@ -2,7 +2,7 @@ use cgmath::{self, Vector2, Vector4, Zero};
 use uuid::Uuid;
 
 use color::Color;
-use graph::Graph;
+use graph::{Connected, Graph};
 use interaction::{InteractionState, MouseInfo};
 use operator::{Op, OpType};
 use preview::Preview;
@@ -44,6 +44,10 @@ pub struct Network {
     /// A flag that controls whether or not the preview will
     /// be drawn
     show_preview: bool,
+
+    /// A flag that controls whether or not ops will be snapped
+    /// to a grid when dragged
+    snapping: bool
 }
 
 enum Pair<T> {
@@ -78,6 +82,7 @@ impl Network {
             root: None,
             dirty: false,
             show_preview: true,
+            snapping: true
         }
     }
 
@@ -169,7 +174,7 @@ impl Network {
     }
 
     /// Draws all ops in the network.
-    fn draw_all_ops(&mut self, renderer: &Renderer) {
+    fn draw_all_ops(&self, renderer: &Renderer) {
         for node in self.graph.get_nodes().iter() {
             self.draw_op(&node.data, renderer);
         }
@@ -206,12 +211,59 @@ impl Network {
 
         let draw_color = Color::white();
 
-        renderer.draw_line(&points, &draw_color);
+        renderer.draw_lines(&points, &draw_color, true);
+    }
+
+    pub fn draw_grid(&self, renderer: &Renderer) {
+        let mut points_v = Vec::new();
+        let mut points_h = Vec::new();
+
+        let lines_x = renderer.get_resolution().x as u32 / 20;
+        let lines_y = renderer.get_resolution().y as u32 / 20;
+        let spacing_x = renderer.get_resolution().x / lines_x as f32;
+        let spacing_y = renderer.get_resolution().y / lines_y as f32;
+        let offset = renderer.get_resolution() * 0.5;
+
+        // Draw vertical lines.
+        for i in 0..lines_x {
+            // Push back the first point.
+            points_v.push(i as f32 * spacing_x - offset.x);
+            points_v.push(-offset.y);
+            points_v.push(0.0);
+            points_v.push(0.0);
+
+            // Push back the second point.
+            points_v.push(i as f32 * spacing_x - offset.x);
+            points_v.push(offset.y);
+            points_v.push(1.0);
+            points_v.push(1.0);
+        }
+
+        // Draw vertical lines.
+        for i in 0..lines_y {
+            // Push back the first point.
+            points_h.push(-offset.x);
+            points_h.push(i as f32 * spacing_y - offset.y);
+            points_h.push(0.0);
+            points_h.push(0.0);
+
+            // Push back the second point.
+            points_h.push(offset.x);
+            points_h.push(i as f32 * spacing_y - offset.y);
+            points_h.push(1.0);
+            points_h.push(1.0);
+        }
+
+        let mut draw_color = Color::from_hex(0x373737);
+        draw_color.a = 0.25;
+        renderer.draw_lines(&points_v, &draw_color, false);
+        renderer.draw_lines(&points_h, &draw_color, false);
     }
 
     /// Draws all of the operators and edges that make
     /// up this graph.
-    pub fn draw(&mut self, renderer: &Renderer) {
+    pub fn draw(&self, renderer: &Renderer) {
+        self.draw_grid(renderer);
         self.draw_all_edges(renderer);
         self.draw_all_ops(renderer);
 
@@ -277,7 +329,11 @@ impl Network {
                     if selected == index {
                         // Is the mouse down?
                         if mouse.ldown {
-                            node.data.translate(&(mouse.curr - mouse.last));
+                            // TODO: let mut velocity = ..;
+                            if self.snapping {
+                                // TODO
+                            }
+                            node.data.translate(&mouse.velocity());
                         }
                         continue;
                     }

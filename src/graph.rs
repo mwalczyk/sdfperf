@@ -100,33 +100,34 @@ impl<N: Connected, E> Graph<N, E> {
 
     /// Removes the edge between nodes `a` and `b` (if it
     /// exists).
-    pub fn remove_edge(&mut self, a: usize, b: usize) {
-        self.edges[a].outputs.retain(|&index| index != b);
-        self.edges[b].inputs.retain(|&index| index != a);
+    pub fn remove_edge(&mut self, src: usize, dst: usize) {
+        self.edges[src].outputs.retain(|&index| index != dst);
+        self.edges[dst].inputs.retain(|&index| index != src);
 
         // Update the number of active inputs leading to
         // node `b`.
-        let count = self.edges[b].inputs.len();
-        self.nodes[b].data.update_active_inputs_count(count);
+        let count = self.edges[dst].inputs.len();
+        self.nodes[dst].data.update_active_inputs_count(count);
     }
 
-    pub fn add_edge(&mut self, a: usize, b: usize) {
-        if a != b && self.nodes[a].data.has_outputs() && self.nodes[b].data.has_inputs() {
+    pub fn add_edge(&mut self, src: usize, dst: usize) {
+        if src != dst && self.nodes[src].data.has_outputs() && self.nodes[dst].data.has_inputs() {
             // If node `b` has reached its input capacity, replace
             // the edge connecting its last input with `b` with
             // the new edge.
-            if self.nodes[b].data.get_number_of_available_inputs() == 0 {
-                let old = self.edges[b].inputs.pop().unwrap();
-                self.remove_edge(old, b);
+            if self.nodes[dst].data.get_number_of_available_inputs() == 0 {
+                let old = self.edges[dst].inputs.pop().unwrap();
+                self.remove_edge(old, dst);
+            } else {
+
             }
 
             // Call the `on_connect` method for each node.
-            self.nodes[a].data.on_connect();
-            self.nodes[b].data.on_connect();
+            self.nodes[dst].data.on_connect();
 
             // Update the edges.
-            self.edges[a].outputs.push(b);
-            self.edges[b].inputs.push(a);
+            self.edges[src].outputs.push(dst);
+            self.edges[dst].inputs.push(src);
         } else {
             println!("Connection failed");
         }

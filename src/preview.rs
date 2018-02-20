@@ -113,7 +113,7 @@ impl Preview {
         // Rebuilds the look-at matrix based on mouse events.
         if self.aabb.inside(&mouse.curr) {
             let mut front = Vector3::zero();
-            let mut offset = mouse.curr - mouse.last;
+            let offset = mouse.curr - mouse.last;
             const ROTATION_SENSITIVITY: f32 = 0.25;
             const TRANSLATION_SENSITIVITY: f32 = 0.005;
 
