@@ -61,13 +61,7 @@ fn main() {
     let mut current_size = Vector2::new(800.0, 600.0);
 
     // Store interaction state
-    let mut mouse = MouseInfo {
-        curr: Vector2::zero(),
-        last: Vector2::zero(),
-        clicked: Vector2::zero(),
-        down: false,
-        scroll: 1.0
-    };
+    let mut mouse = MouseInfo::new();
 
     loop {
         events_loop.poll_events(|event| {
@@ -79,6 +73,8 @@ fn main() {
                         current_size.x = w as f32;
                         current_size.y = h as f32;
                         gl_window.resize(w, h);
+
+                        renderer.resize(&current_size);
                     }
 
                     glutin::WindowEvent::MouseMoved { position, .. } => {
@@ -106,14 +102,23 @@ fn main() {
                         }
                     }
 
-                    glutin::WindowEvent::MouseInput { state, .. } => {
+                    glutin::WindowEvent::MouseInput { state, button, .. } => {
                         if let glutin::ElementState::Pressed = state {
                             // Store the current mouse position.
                             mouse.clicked = mouse.curr;
-                            mouse.down = true;
+
+                            // Store mouse button presses.
+                            match button {
+                                glutin::MouseButton::Left => mouse.ldown = true,
+                                glutin::MouseButton::Right => mouse.rdown = true,
+                                glutin::MouseButton::Middle => mouse.mdown = true,
+                                _ => (),
+                            }
                             network.handle_interaction(&mouse);
                         } else {
-                            mouse.down = false;
+                            mouse.ldown = false;
+                            mouse.rdown = false;
+                            mouse.mdown = false;
                         }
                     }
 
@@ -144,7 +149,7 @@ fn main() {
                                         glutin::VirtualKeyCode::H => {
                                             mouse.scroll = 1.0;
                                             network.preview.home();
-                                        },
+                                        }
                                         glutin::VirtualKeyCode::P => network.toggle_preview(),
                                         glutin::VirtualKeyCode::Key1 => {
                                             network.preview.set_shading(Shading::Diffuse)

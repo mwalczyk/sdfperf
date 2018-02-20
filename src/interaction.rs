@@ -1,4 +1,4 @@
-use cgmath::Vector2;
+use cgmath::{Vector2, Zero};
 
 pub struct MouseInfo {
     /// The current position of the mouse
@@ -10,14 +10,35 @@ pub struct MouseInfo {
     /// The last position that the user clicked
     pub clicked: Vector2<f32>,
 
-    /// A flag denoting whether or not the mouse is
-    /// currently pressed
-    pub down: bool,
+    /// A flag denoting whether or not the left
+    /// mouse button is currently pressed
+    pub ldown: bool,
+
+    /// A flag denoting whether or not the right
+    /// mouse button is currently pressed
+    pub rdown: bool,
+
+    /// A flag denoting whether or not the middle
+    /// mouse button is currently pressed
+    pub mdown: bool,
 
     /// The scroll status of the mouse
-    pub scroll: f32
+    pub scroll: f32,
 }
 
+impl MouseInfo {
+    pub fn new() -> MouseInfo {
+        MouseInfo {
+            curr: Vector2::zero(),
+            last: Vector2::zero(),
+            clicked: Vector2::zero(),
+            ldown: false,
+            rdown: false,
+            mdown: false,
+            scroll: 1.0,
+        }
+    }
+}
 pub enum InteractionState {
     Deselected,
     Selected,

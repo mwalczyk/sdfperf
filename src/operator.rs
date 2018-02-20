@@ -83,9 +83,9 @@ impl OpType {
         // In all branches, `p` refers to the current position along the ray,
         // i.e. the variable used in the `map` function.
         match *self {
-            OpType::Sphere => "float {} = sdf_sphere(p, vec3(0.0), 5.0);".to_string(),
-            OpType::Box => "float {} = sdf_box(p, vec3(4.0));".to_string(),
-            OpType::Plane => "float {} = sdf_plane(p, 0.0);".to_string(),
+            OpType::Sphere => "float {} = sdf_sphere(p, vec3(0.0), 1.0);".to_string(),
+            OpType::Box => "float {} = sdf_box(p, vec3(1.0));".to_string(),
+            OpType::Plane => "float {} = sdf_plane(p, -1.0);".to_string(),
             OpType::Union => "float {} = op_union({}, {});".to_string(),
             OpType::Intersection => "float {} = op_intersect({}, {});".to_string(),
             OpType::SmoothMinimum => "float {} = op_smooth_min({}, {}, 1.0);".to_string(),
@@ -204,17 +204,16 @@ impl Connected for Op {
         self.family.has_outputs()
     }
 
-    fn get_active_inputs_count(&self) -> usize {
-        self.active_inputs
+    fn get_number_of_available_inputs(&self) -> usize {
+        self.family.get_input_capacity() - self.active_inputs
     }
 
-    fn get_input_capacity(&self) -> usize {
-        self.family.get_input_capacity()
+    fn update_active_inputs_count(&mut self, count: usize) {
+        self.active_inputs = count;
     }
 
     fn on_connect(&mut self) {
         self.active_inputs += 1;
-        println!("Added edge that includes: {}", self.name);
     }
 
     fn on_disconnect(&mut self) {

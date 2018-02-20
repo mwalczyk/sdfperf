@@ -3,8 +3,8 @@ use std::cmp::max;
 pub trait Connected {
     fn has_inputs(&self) -> bool;
     fn has_outputs(&self) -> bool;
-    fn get_active_inputs_count(&self) -> usize;
-    fn get_input_capacity(&self) -> usize;
+    fn get_number_of_available_inputs(&self) -> usize;
+    fn update_active_inputs_count(&mut self, count: usize);
     fn on_connect(&mut self);
     fn on_disconnect(&mut self);
 }
@@ -73,12 +73,15 @@ impl<N: Connected, E> Graph<N, E> {
         let removed_edges = self.edges.swap_remove(i);
 
         // Prune edges.
-        for edges in self.edges.iter_mut() {
-            // Delete edges that started at the removed node.
-            edges.inputs.retain(|&index| index != i);
+        for (index, edges) in self.edges.iter_mut().enumerate() {
+            // Delete edges that started at the removed node and
+            // update the number of active inputs.
+            edges.inputs.retain(|&input| input != i);
+            let count = edges.inputs.len();
+            self.nodes[index].data.update_active_inputs_count(count);
 
             // Delete edges that terminated at the removed node.
-            edges.outputs.retain(|&index| index != i);
+            edges.outputs.retain(|&output| output != i);
 
             // Update any edges that were pointing to or from the
             // swapped node.
@@ -95,15 +98,16 @@ impl<N: Connected, E> Graph<N, E> {
         }
     }
 
+    /// Removes the edge between nodes `a` and `b` (if it
+    /// exists).
     pub fn remove_edge(&mut self, a: usize, b: usize) {
-        let removed_a = self.edges[a].outputs.remove_item(&b);
-        let removed_b = self.edges[b].inputs.remove_item(&a);
+        self.edges[a].outputs.retain(|&index| index != b);
+        self.edges[b].inputs.retain(|&index| index != a);
 
-        // If both of the remove
-        if let (Some(_), Some(_)) = (removed_a, removed_b) {
-            self.nodes[a].data.on_disconnect();
-            self.nodes[b].data.on_disconnect();
-        }
+        // Update the number of active inputs leading to
+        // node `b`.
+        let count = self.edges[b].inputs.len();
+        self.nodes[b].data.update_active_inputs_count(count);
     }
 
     pub fn add_edge(&mut self, a: usize, b: usize) {
@@ -111,16 +115,16 @@ impl<N: Connected, E> Graph<N, E> {
             // If node `b` has reached its input capacity, replace
             // the edge connecting its last input with `b` with
             // the new edge.
-            if self.nodes[b].data.get_active_inputs_count()
-                >= self.nodes[b].data.get_input_capacity()
-            {
+            if self.nodes[b].data.get_number_of_available_inputs() == 0 {
                 let old = self.edges[b].inputs.pop().unwrap();
                 self.remove_edge(old, b);
             }
 
+            // Call the `on_connect` method for each node.
             self.nodes[a].data.on_connect();
             self.nodes[b].data.on_connect();
 
+            // Update the edges.
             self.edges[a].outputs.push(b);
             self.edges[b].inputs.push(a);
         } else {
@@ -148,7 +152,16 @@ impl<N: Connected, E> Graph<N, E> {
             self.recurse(*index, indices, visited);
         }
 
-        // Finally, push back the root index.
-        indices.push(root);
+        // Finally, push back the root index: note that
+        // here we choose to ignore duplicate entries.
+        // This occurs when a node is connected to multiple
+        // nodes at varying depths in the graph.
+        //
+        // In other scenarios, we might want to allow this
+        // insertion to happen, regardless if the index
+        // exists in `indices` already.
+        if !indices.contains(&root) {
+            indices.push(root);
+        }
     }
 }

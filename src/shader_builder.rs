@@ -48,7 +48,7 @@ impl ShaderBuilder {
 
         const uint MAX_STEPS = 128u;
         const float MAX_TRACE_DISTANCE = 32.0;
-        const float MIN_HIT_DISTANCE = 0.0001;
+        const float MIN_HIT_DISTANCE = 0.001;
 
         struct ray
         {

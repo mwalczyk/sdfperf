@@ -27,15 +27,15 @@ pub struct Network {
     /// An adjacency list representation of ops
     pub graph: Graph<Op, Connection>,
 
+    /// The preview of the shader that is represented by the
+    /// current network
+    pub preview: Preview,
+
     /// The index of the currently selected op (if there is one)
     pub selection: Option<usize>,
 
     /// The index of the root op (if there is one)
     pub root: Option<usize>,
-
-    /// The preview of the shader that is represented by the
-    /// current network
-    pub preview: Preview,
 
     /// A flag that controls whether or not the shader graph
     /// needs to be rebuilt
@@ -43,7 +43,7 @@ pub struct Network {
 
     /// A flag that controls whether or not the preview will
     /// be drawn
-    show_preview: bool
+    show_preview: bool,
 }
 
 enum Pair<T> {
@@ -73,11 +73,11 @@ impl Network {
     pub fn new() -> Network {
         Network {
             graph: Graph::new(),
+            preview: Preview::new(),
             selection: None,
             root: None,
-            preview: Preview::new(),
             dirty: false,
-            show_preview: true
+            show_preview: true,
         }
     }
 
@@ -113,16 +113,13 @@ impl Network {
                     }
                 }
             }
-
             self.graph.remove_node(selected);
             self.selection = None;
-            println!("Number of vertices: {}", self.graph.nodes.len());
-            println!("Number of edge lists: {}", self.graph.edges.len());
         }
     }
 
-    /// Adds a new op of type `op_type` to the network at coordinates
-    /// `screen_position` and dimensions `screen_size`.
+    /// Adds a new op of type `family` to the network at coordinates
+    /// `position` and dimensions `screen_size`.
     pub fn add_op(&mut self, family: OpType, position: Vector2<f32>, size: Vector2<f32>) {
         let op = Op::new(family, position, size);
         self.graph.add_node(op, 0);
@@ -140,11 +137,9 @@ impl Network {
         };
 
         // Add a contribution based on the op's current interaction state.
-        color += match op.state {
-            InteractionState::Hover => Color::mono(0.05, 0.0),
-            _ => Color::black(),
-        };
-
+        if let InteractionState::Hover = op.state {
+            color += Color::mono(0.05, 0.0);
+        }
         color
     }
 
@@ -189,6 +184,9 @@ impl Network {
                 let src_node = self.graph.get_node(src).unwrap();
                 let dst_node = self.graph.get_node(*dst).unwrap();
 
+                // How many inputs does the destination node
+                // currently have?
+                //let dst_inputs_count = self.graph.edges[*dst].inputs.len();
                 let src_centroid = src_node.data.aabb_slot_output.centroid();
                 let dst_centroid = dst_node.data.aabb_slot_input.centroid();
 
@@ -227,6 +225,12 @@ impl Network {
         self.graph.add_edge(a, b);
 
         if let Pair::Both(node_a, node_b) = index_twice(&mut self.graph.nodes, a, b) {
+            // If we previously connected to a render op, then we
+            // know that the graph must be rebuilt.
+            if let Some(_) = self.root {
+                self.dirty = true;
+                println!("Active render node in-line: re-building graph");
+            }
             // If we are connecting to a render op, then the shader
             // must be rebuilt.
             if node_b.data.family == OpType::Render {
@@ -250,7 +254,7 @@ impl Network {
 
         for (index, node) in self.graph.nodes.iter_mut().enumerate() {
             if let InteractionState::ConnectSource = node.data.state {
-                if mouse.down {
+                if mouse.ldown {
                     // If this operator is currently being connected to another:
                     // 1) Set the `connecting` flag to `true`, as the user is
                     //    performing a potential op connection
@@ -272,7 +276,7 @@ impl Network {
                     // Is this op the selected op?
                     if selected == index {
                         // Is the mouse down?
-                        if mouse.down {
+                        if mouse.ldown {
                             node.data.translate(&(mouse.curr - mouse.last));
                         }
                         continue;
@@ -281,7 +285,7 @@ impl Network {
 
                 // This op is not the selected op, but we are inside of it's
                 // bounding box. Is the mouse down?
-                if mouse.down {
+                if mouse.ldown {
                     // Are we inside the bounds of this op's output slot?
                     if node.data
                         .aabb_slot_output
@@ -311,8 +315,15 @@ impl Network {
                 if let Some(selected) = self.selection {
                     // Is this op the selected op?
                     if selected == index {
-                        // Keep this op selected.
-                        node.data.state = InteractionState::Selected;
+                        // Is the mouse down?
+                        if mouse.ldown {
+                            // The user has clicked somewhere else in the
+                            // network, so reset the selection.
+                            self.selection = None;
+                        } else {
+                            // Keep this op selected.
+                            node.data.state = InteractionState::Selected;
+                        }
                     } else {
                         // Deselect the op.
                         node.data.state = InteractionState::Deselected;

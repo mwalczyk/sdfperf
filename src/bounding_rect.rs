@@ -26,6 +26,14 @@ impl BoundingRect {
         rect
     }
 
+    pub fn get_upper_left(&self) -> &Vector2<f32> {
+        &self.upper_left
+    }
+
+    pub fn get_size(&self) -> &Vector2<f32> {
+        &self.size
+    }
+
     pub fn expand_from_center(&self, delta: &Vector2<f32>) -> BoundingRect {
         BoundingRect::new(self.upper_left - delta * 0.5, self.size + delta)
     }

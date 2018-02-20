@@ -1,4 +1,4 @@
-use cgmath::{InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero, EuclideanSpace};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero};
 
 use bounding_rect::BoundingRect;
 use color::Color;
@@ -75,11 +75,11 @@ impl Preview {
             program_error,
             aabb: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
             look_at: Matrix4::look_at(
-                Point3::new(0.0, 0.0, 10.0),
+                Point3::new(0.0, 0.0, 3.0),
                 Point3::new(0.0, 0.0, 0.0),
                 Vector3::unit_y(),
             ),
-            camera_position: Point3::new(0.0, 0.0, 10.0),
+            camera_position: Point3::new(0.0, 0.0, 3.0),
             yaw: -90.0,
             pitch: 0.0,
             shading: Shading::Normals,
@@ -97,42 +97,54 @@ impl Preview {
         self.program_valid = program;
     }
 
+    /// Sets the SDF shading mode.
     pub fn set_shading(&mut self, shading: Shading) {
         self.shading = shading;
     }
 
+    /// Homes the virtual preview camera.
     pub fn home(&mut self) {
         self.yaw = -90.0;
         self.pitch = 0.0;
+        self.camera_position = Point3::new(0.0, 0.0, 3.0);
     }
 
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
         // Rebuilds the look-at matrix based on mouse events.
         if self.aabb.inside(&mouse.curr) {
             let mut front = Vector3::zero();
-            if mouse.down {
-                let mut offset = mouse.curr - mouse.last;
-                const SENSITIVITY: f32 = 0.25;
-                offset *= SENSITIVITY;
+            let mut offset = mouse.curr - mouse.last;
+            const ROTATION_SENSITIVITY: f32 = 0.25;
+            const TRANSLATION_SENSITIVITY: f32 = 0.005;
 
-                self.yaw += offset.x;
-                self.pitch += offset.y;
+            // Handle camera rotation.
+            if mouse.ldown {
+                self.yaw += offset.x * ROTATION_SENSITIVITY;
+                self.pitch += offset.y * ROTATION_SENSITIVITY;
 
-                if self.pitch > 89.0 {
-                    self.pitch = 89.0;
-                }
-
-                if self.pitch < -89.0 {
-                    self.pitch = -89.0;
-                }
+                // Prevent the screen from flipping.
+                self.pitch.min(89.0).max(-89.0);
             }
 
+            // Based on the Euler angles calculated above,
+            // create the virtual camera's "front" (forward-facing)
+            // vector.
             front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
             front.y = self.pitch.to_radians().sin();
             front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
             front.normalize();
 
-            self.camera_position.z = 10.0 * mouse.scroll;
+            // TODO: this isn't working.
+            // Handle camera translation.
+            if mouse.rdown {
+                // Strafe left and right.
+                self.camera_position +=
+                    front.cross(Vector3::unit_y()).normalize() * offset.x * TRANSLATION_SENSITIVITY;
+
+                // Move forward and backwards.
+                self.camera_position += front * offset.y * TRANSLATION_SENSITIVITY;
+            }
+
             self.look_at = Matrix4::look_at(
                 self.camera_position,
                 self.camera_position + front,
@@ -145,7 +157,6 @@ impl Preview {
     /// preview window in the lower right-hand corner of the
     /// network.
     pub fn draw(&self, renderer: &Renderer) {
-
         if let Some(ref program) = self.program_valid {
             // Set the look-at matrix that will be used to construct
             // the virtual camera.
