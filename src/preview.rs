@@ -63,8 +63,9 @@ impl Preview {
 
             float total = dot(ipos, vec2(1.0));
             float checkerboard = mod(total, 2.0);
+            const float alpha = 0.25;
 
-            o_color = vec4(vec3(checkerboard), 1.0);;
+            o_color = vec4(vec3(checkerboard), alpha);
         }";
 
         let program_error =

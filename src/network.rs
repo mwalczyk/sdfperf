@@ -18,6 +18,7 @@ use std::cmp::max;
 /// Combiner:    0xA8B6C5 (blue)
 /// Render:      0xC77832 (orange)
 /// Selection:   0x76B264 (green)
+/// Error:       0xA0502B (dark orange)
 /// Other:       0xFEC56D (yellow)
 ///
 
@@ -47,7 +48,7 @@ pub struct Network {
 
     /// A flag that controls whether or not ops will be snapped
     /// to a grid when dragged
-    snapping: bool
+    snapping: bool,
 }
 
 enum Pair<T> {
@@ -82,7 +83,7 @@ impl Network {
             root: None,
             dirty: false,
             show_preview: true,
-            snapping: true
+            snapping: true,
         }
     }
 

@@ -34,6 +34,10 @@ impl BoundingRect {
         &self.size
     }
 
+    pub fn snap_to_nearest(&mut self, increment: &Vector2<f32>) {
+        // TODO
+    }
+
     pub fn expand_from_center(&self, delta: &Vector2<f32>) -> BoundingRect {
         BoundingRect::new(self.upper_left - delta * 0.5, self.size + delta)
     }

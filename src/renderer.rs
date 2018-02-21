@@ -15,7 +15,7 @@ use std::time::{Duration, SystemTime};
 pub enum Alpha {
     One,
     Dashed,
-    Constant(f32)
+    Constant(f32),
 }
 
 pub struct Renderer {
@@ -238,6 +238,10 @@ impl Renderer {
             -1.0,
             1.0,
         );
+
+        // Set the uniform.
+        self.program_draw
+            .uniform_matrix_4f("u_projection_matrix", &self.projection);
     }
 
     pub fn conditionally_bind(&mut self, id: GLuint) -> bool {
@@ -263,8 +267,6 @@ impl Renderer {
         // First, set all relevant uniforms.
         self.program_draw
             .uniform_matrix_4f("u_model_matrix", &rect.get_model_matrix());
-        self.program_draw
-            .uniform_matrix_4f("u_projection_matrix", &self.projection);
         self.program_draw
             .uniform_4f("u_draw_color", &(*color).into());
         self.program_draw.uniform_1ui("u_draw_mode", 0);
@@ -321,8 +323,6 @@ impl Renderer {
         let model = Matrix4::identity();
         self.program_draw
             .uniform_matrix_4f("u_model_matrix", &model);
-        self.program_draw
-            .uniform_matrix_4f("u_projection_matrix", &self.projection);
         self.program_draw
             .uniform_4f("u_draw_color", &(*color).into());
         self.program_draw.uniform_1ui("u_draw_mode", dashed as u32);
