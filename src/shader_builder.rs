@@ -236,6 +236,9 @@ impl ShaderBuilder {
                     }
 
                     OpType::Render => {
+                        if network.graph.edges[index].inputs.len() < 1 {
+                            return None;
+                        }
                         let src = network.graph.edges[index].inputs[0];
                         let name = network.graph.get_node(src).unwrap().data.name.clone();
                         let mut code = node.data.family.get_formatted(vec![

@@ -6,6 +6,7 @@
 extern crate cgmath;
 extern crate gl;
 extern crate glutin;
+extern crate image;
 extern crate uuid;
 
 mod bounding_rect;
@@ -19,6 +20,7 @@ mod program;
 mod renderer;
 mod shader_builder;
 mod shader_string;
+mod texture;
 
 use color::Color;
 use interaction::MouseInfo;

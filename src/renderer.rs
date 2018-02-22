@@ -5,6 +5,7 @@ use cgmath::{self, Matrix, Matrix4, One, PerspectiveFov, SquareMatrix, Vector2, 
 use bounding_rect::BoundingRect;
 use color::Color;
 use program::Program;
+use texture::Texture;
 
 use std::mem;
 use std::ptr;
@@ -261,7 +262,7 @@ impl Renderer {
     }
 
     /// Draws the rectangle described by `rect`, with solid `color`.
-    pub fn draw_rect(&self, rect: &BoundingRect, color: &Color) {
+    pub fn draw_rect(&self, rect: &BoundingRect, color: &Color, tex: Option<Texture>) {
         self.program_draw.bind();
 
         // First, set all relevant uniforms.

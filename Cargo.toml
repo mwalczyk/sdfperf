@@ -8,3 +8,4 @@ gl = "0.6.5"
 glutin = "0.10.1"
 cgmath = "0.15.0"
 uuid = { version = "0.5.1", features = ["v4"] }
+image = "0.18.0"

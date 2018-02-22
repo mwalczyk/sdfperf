@@ -160,18 +160,18 @@ impl Network {
         match op.state {
             InteractionState::Selected => {
                 let aabb_select = op.aabb_op.expand_from_center(&Vector2::new(6.0, 6.0));
-                renderer.draw_rect(&aabb_select, &Color::from_hex(0x76B264));
+                renderer.draw_rect(&aabb_select, &Color::from_hex(0x76B264), None);
             }
             InteractionState::ConnectSource => {
-                renderer.draw_rect(&op.aabb_slot_output, &slot_color)
+                renderer.draw_rect(&op.aabb_slot_output, &slot_color, None)
             }
             InteractionState::ConnectDestination => {
-                renderer.draw_rect(&op.aabb_slot_input, &slot_color)
+                renderer.draw_rect(&op.aabb_slot_input, &slot_color, None)
             }
             _ => (),
         }
 
-        renderer.draw_rect(&op.aabb_op, &self.color_for_op(op));
+        renderer.draw_rect(&op.aabb_op, &self.color_for_op(op), None);
     }
 
     /// Draws all ops in the network.
