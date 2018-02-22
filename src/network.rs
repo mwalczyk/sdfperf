@@ -7,8 +7,10 @@ use interaction::{InteractionState, MouseInfo};
 use operator::{Op, OpType};
 use preview::Preview;
 use renderer::Renderer;
+use texture::Texture;
 
 use std::cmp::max;
+use std::collections::HashMap;
 
 /// Palette:
 ///
@@ -49,6 +51,8 @@ pub struct Network {
     /// A flag that controls whether or not ops will be snapped
     /// to a grid when dragged
     snapping: bool,
+
+    icons: HashMap<&'static str, Texture>
 }
 
 enum Pair<T> {
@@ -76,7 +80,7 @@ fn index_twice<T>(slc: &mut [T], a: usize, b: usize) -> Pair<&mut T> {
 impl Network {
     /// Constructs a new, empty network.
     pub fn new() -> Network {
-        Network {
+        let mut network = Network {
             graph: Graph::new(),
             preview: Preview::new(),
             selection: None,
@@ -84,7 +88,16 @@ impl Network {
             dirty: false,
             show_preview: true,
             snapping: true,
-        }
+            icons: HashMap::new()
+        };
+
+        network.icons.insert("union", Texture::new("assets/union.png"));
+        network.icons.insert("intersection", Texture::new("assets/intersection.png"));
+        network.icons.insert("smooth_minimum", Texture::new("assets/subtraction.png"));
+
+        // TODO: the last texture key is not correct
+
+        network
     }
 
     /// Returns `true` if the shader graph needs to be rebuilt and
@@ -171,7 +184,13 @@ impl Network {
             _ => (),
         }
 
+        // Draw the body of the op.
         renderer.draw_rect(&op.aabb_op, &self.color_for_op(op), None);
+
+        // Draw the icon (if one exists).
+        if let Some(tex) = self.icons.get(op.family.to_string()) {
+            renderer.draw_rect(&op.aabb_icon, &self.color_for_op(op), Some(tex));
+        }
     }
 
     /// Draws all ops in the network.

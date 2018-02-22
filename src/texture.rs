@@ -8,13 +8,15 @@ use std::os::raw::c_void;
 
 pub struct Texture {
     pixels: Vec<u8>,
+
     resolution: Vector2<f32>,
+
     id: GLuint,
 }
 
 impl Texture {
     pub fn new(file: &str) -> Texture {
-        let image = image::open("assets/union.png").unwrap().to_rgba();
+        let image = image::open(file).unwrap().to_rgba();
         let (w, h) = image.dimensions();
         let pixels: Vec<u8> = image.into_raw();
 
@@ -22,8 +24,8 @@ impl Texture {
         unsafe {
             // Create the texture and set parameters.
             gl::CreateTextures(gl::TEXTURE_2D, 1, &mut id);
-            gl::TextureParameteri(id, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
-            gl::TextureParameteri(id, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+            gl::TextureParameteri(id, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+            gl::TextureParameteri(id, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
             gl::TextureParameteri(id, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
             gl::TextureParameteri(id, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
 
@@ -45,13 +47,19 @@ impl Texture {
         Texture {
             pixels,
             resolution: Vector2::new(w as f32, h as f32),
-            id,
+            id
         }
     }
 
     pub fn bind(&self, unit: u32) {
         unsafe {
             gl::BindTextureUnit(unit, self.id);
+        }
+    }
+
+    pub fn unbind(&self, unit: u32) {
+        unsafe {
+            gl::BindTextureUnit(unit, 0);
         }
     }
 

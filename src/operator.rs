@@ -40,15 +40,15 @@ pub enum OpType {
 
 impl OpType {
     /// Converts the enum variant into a human-readable string format.
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self) -> &'static str {
         match *self {
-            OpType::Sphere => "sphere".to_string(),
-            OpType::Box => "box".to_string(),
-            OpType::Plane => "plane".to_string(),
-            OpType::Union => "union".to_string(),
-            OpType::Intersection => "intersection".to_string(),
-            OpType::SmoothMinimum => "smooth_minimum".to_string(),
-            OpType::Render => "render".to_string(),
+            OpType::Sphere => "sphere",
+            OpType::Box => "box",
+            OpType::Plane => "plane",
+            OpType::Union => "union",
+            OpType::Intersection => "intersection",
+            OpType::SmoothMinimum => "smooth_minimum",
+            OpType::Render => "render"
         }
     }
 
@@ -132,6 +132,9 @@ pub struct Op {
     /// The bounding box of the op's output slot
     pub aabb_slot_output: BoundingRect,
 
+    /// The bounding box of the op's icon
+    pub aabb_icon: BoundingRect,
+
     /// The current interaction state of the op
     pub state: InteractionState,
 
@@ -171,6 +174,8 @@ impl Op {
             SLOT_SIZE,
         );
 
+        let aabb_icon = BoundingRect::new(position, Vector2::new(size.y, size.y));
+
         let name = format!("{}_{}", family.to_string(), count);
 
         Op {
@@ -178,6 +183,7 @@ impl Op {
             aabb_op,
             aabb_slot_input,
             aabb_slot_output,
+            aabb_icon,
             state: InteractionState::Deselected,
             uuid: Uuid::new_v4(),
             name,
@@ -192,6 +198,7 @@ impl Op {
         self.aabb_op.translate(offset);
         self.aabb_slot_input.translate(offset);
         self.aabb_slot_output.translate(offset);
+        self.aabb_icon.translate(offset);
     }
 }
 

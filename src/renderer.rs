@@ -93,23 +93,27 @@ impl Renderer {
         uniform vec4 u_draw_color = vec4(1.0);
         uniform uint u_draw_mode = 0;
 
+        layout(binding = 0) uniform sampler2D u_color_map;
+        uniform bool u_use_maps;
+
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
 
         void main() {
             vec2 uv = vs_texcoord;
 
-            float alpha = 1.0;
-            switch(u_draw_mode)
+            const float stripes = 20.0;
+            float alpha = u_draw_mode == 0 ? 1.0 : max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
+
+            if (u_use_maps)
             {
-            case 0:
-                alpha = 1.0;
-                break;
-            case 1:
-                alpha = step(0.5, fract(uv.s * 20.0 - u_time)) + 0.4;
-                break;
+                vec4 color = texture(u_color_map, uv);
+                o_color = color;
             }
-            o_color = vec4(u_draw_color.rgb, alpha);
+            else
+            {
+                o_color = vec4(u_draw_color.rgb, alpha);
+            }
         }";
 
         // Compile the shader program.
@@ -262,7 +266,7 @@ impl Renderer {
     }
 
     /// Draws the rectangle described by `rect`, with solid `color`.
-    pub fn draw_rect(&self, rect: &BoundingRect, color: &Color, tex: Option<Texture>) {
+    pub fn draw_rect(&self, rect: &BoundingRect, color: &Color, tex: Option<&Texture>) {
         self.program_draw.bind();
 
         // First, set all relevant uniforms.
@@ -273,6 +277,14 @@ impl Renderer {
         self.program_draw.uniform_1ui("u_draw_mode", 0);
         self.program_draw
             .uniform_1f("u_time", self.get_elapsed_seconds());
+
+        // Bind the color map, if available.
+        if let Some(tex) = tex {
+            self.program_draw.uniform_1i("u_use_maps", true as i32);
+            tex.bind(0);
+        } else {
+            self.program_draw.uniform_1i("u_use_maps", false as i32);
+        }
 
         // Next, issue a draw call.
         unsafe {
@@ -286,6 +298,11 @@ impl Renderer {
 
             gl::BindVertexArray(self.vao);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
+        }
+
+        // Unbind the color map, if it was used.
+        if let Some(tex) = tex {
+            tex.unbind(0);
         }
 
         self.program_draw.unbind();
@@ -329,6 +346,7 @@ impl Renderer {
         self.program_draw.uniform_1ui("u_draw_mode", dashed as u32);
         self.program_draw
             .uniform_1f("u_time", self.get_elapsed_seconds());
+        self.program_draw.uniform_1i("u_use_maps", false as i32);
 
         // Next, update buffer storage and issue a draw call.
         unsafe {

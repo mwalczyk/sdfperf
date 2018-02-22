@@ -7,7 +7,7 @@ pub enum Edge {
     Bottom,
 }
 
-#[derive(PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct BoundingRect {
     upper_left: Vector2<f32>,
     size: Vector2<f32>,
