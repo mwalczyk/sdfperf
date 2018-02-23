@@ -23,6 +23,9 @@ pub enum OpType {
     /// Merges two distance fields using a `min` operation
     Union,
 
+    /// Merges two distance fields using a `max` operation and negation
+    Subtraction,
+
     /// Merges two distance fields using a `max` operation
     Intersection,
 
@@ -46,9 +49,10 @@ impl OpType {
             OpType::Box => "box",
             OpType::Plane => "plane",
             OpType::Union => "union",
+            OpType::Subtraction => "subtraction",
             OpType::Intersection => "intersection",
             OpType::SmoothMinimum => "smooth_minimum",
-            OpType::Render => "render"
+            OpType::Render => "render",
         }
     }
 
@@ -59,7 +63,7 @@ impl OpType {
     pub fn get_input_capacity(&self) -> usize {
         match *self {
             OpType::Sphere | OpType::Box | OpType::Plane => 0,
-            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => 2,
+            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => 2,
             OpType::Render => 1,
         }
     }
@@ -87,6 +91,7 @@ impl OpType {
             OpType::Box => "float {} = sdf_box(p, vec3(1.0));".to_string(),
             OpType::Plane => "float {} = sdf_plane(p, -1.0);".to_string(),
             OpType::Union => "float {} = op_union({}, {});".to_string(),
+            OpType::Subtraction => "float {} = op_subtract({}, {});".to_string(),
             OpType::Intersection => "float {} = op_intersect({}, {});".to_string(),
             OpType::SmoothMinimum => "float {} = op_smooth_min({}, {}, 1.0);".to_string(),
             OpType::Render => "float {} = {};".to_string(),
@@ -98,7 +103,7 @@ impl OpType {
     pub fn get_number_of_entries(&self) -> usize {
         match *self {
             OpType::Sphere | OpType::Box | OpType::Plane => 1,
-            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => 3,
+            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => 3,
             OpType::Render => 2,
         }
     }
@@ -174,7 +179,7 @@ impl Op {
             SLOT_SIZE,
         );
 
-        let aabb_icon = BoundingRect::new(position, Vector2::new(size.y, size.y));
+        let aabb_icon = BoundingRect::new(position, Vector2::new(40.0, 40.0));
 
         let name = format!("{}_{}", family.to_string(), count);
 

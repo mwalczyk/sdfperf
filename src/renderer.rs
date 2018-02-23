@@ -103,10 +103,11 @@ impl Renderer {
             vec2 uv = vs_texcoord;
 
             const float stripes = 20.0;
-            float alpha = u_draw_mode == 0 ? 1.0 : max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
+            float alpha = u_draw_mode == 0 ? u_draw_color.a : max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
 
             if (u_use_maps)
             {
+                uv.t = 1.0 - uv.t;
                 vec4 color = texture(u_color_map, uv);
                 o_color = color;
             }

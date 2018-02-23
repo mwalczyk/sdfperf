@@ -19,11 +19,11 @@ impl Color {
         Color::new(rgb, rgb, rgb, a)
     }
 
-    pub fn from_hex(code: u32) -> Color {
+    pub fn from_hex(code: u32, alpha: f32) -> Color {
         let r = ((code >> 16) & 0xFF) as f32 / 255.0; // Extract the RR byte
         let g = ((code >> 8) & 0xFF) as f32 / 255.0; // Extract the GG byte
         let b = ((code) & 0xFF) as f32 / 255.0; // Extract the BB byte
-        Color::new(r, g, b, 1.0)
+        Color::new(r, g, b, alpha)
     }
 
     pub fn white() -> Color {

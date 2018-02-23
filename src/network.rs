@@ -11,6 +11,10 @@ use texture::Texture;
 
 use std::cmp::max;
 use std::collections::HashMap;
+use std::io;
+use std::fs::{self, DirEntry};
+use std::path::Path;
+use std::ffi::OsStr;
 
 /// Palette:
 ///
@@ -52,7 +56,7 @@ pub struct Network {
     /// to a grid when dragged
     snapping: bool,
 
-    icons: HashMap<&'static str, Texture>
+    icons: HashMap<String, Texture>,
 }
 
 enum Pair<T> {
@@ -62,7 +66,6 @@ enum Pair<T> {
 }
 
 /// Get mutable references at index `a` and `b`.
-/// See: https://stackoverflow.com/questions/30073684/how-to-get-mutable-references-to-two-array-elements-at-the-same-time
 fn index_twice<T>(slc: &mut [T], a: usize, b: usize) -> Pair<&mut T> {
     if max(a, b) >= slc.len() {
         Pair::None
@@ -88,14 +91,21 @@ impl Network {
             dirty: false,
             show_preview: true,
             snapping: true,
-            icons: HashMap::new()
+            icons: HashMap::new(),
         };
 
-        network.icons.insert("union", Texture::new("assets/union.png"));
-        network.icons.insert("intersection", Texture::new("assets/intersection.png"));
-        network.icons.insert("smooth_minimum", Texture::new("assets/subtraction.png"));
+        // Load all assets.
+        for entry in fs::read_dir("assets").unwrap() {
+            let path = entry.unwrap().path();
+            let file = path.file_stem().unwrap();
+            let ext = path.extension();
 
-        // TODO: the last texture key is not correct
+            if ext == Some(OsStr::new("png")) {
+                network
+                    .icons
+                    .insert(file.to_str().unwrap().to_string(), Texture::new(&path));
+            }
+        }
 
         network
     }
@@ -138,7 +148,7 @@ impl Network {
     }
 
     /// Adds a new op of type `family` to the network at coordinates
-    /// `position` and dimensions `screen_size`.
+    /// `position` and dimensions `size`.
     pub fn add_op(&mut self, family: OpType, position: Vector2<f32>, size: Vector2<f32>) {
         let op = Op::new(family, position, size);
         self.graph.add_node(op, 0);
@@ -148,11 +158,11 @@ impl Network {
     /// operator and the op type.
     fn color_for_op(&self, op: &Op) -> Color {
         let mut color = match op.family {
-            OpType::Sphere | OpType::Box | OpType::Plane => Color::from_hex(0x8F719D),
-            OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
-                Color::from_hex(0xA8B6C5)
+            OpType::Sphere | OpType::Box | OpType::Plane => Color::from_hex(0x8F719D, 1.0),
+            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
+                Color::from_hex(0xA8B6C5, 1.0)
             }
-            OpType::Render => Color::from_hex(0xC77832),
+            OpType::Render => Color::from_hex(0xC77832, 1.0),
         };
 
         // Add a contribution based on the op's current interaction state.
@@ -168,12 +178,12 @@ impl Network {
         // - If the op is selected, draw a selection box behind it
         // - If the op is being used as a connection source or
         //   destination, draw the appropriate connection slot
-        let slot_color = Color::from_hex(0x373737);
+        let slot_color = Color::from_hex(0x373737, 1.0);
 
         match op.state {
             InteractionState::Selected => {
                 let aabb_select = op.aabb_op.expand_from_center(&Vector2::new(6.0, 6.0));
-                renderer.draw_rect(&aabb_select, &Color::from_hex(0x76B264), None);
+                renderer.draw_rect(&aabb_select, &Color::from_hex(0x76B264, 1.0), None);
             }
             InteractionState::ConnectSource => {
                 renderer.draw_rect(&op.aabb_slot_output, &slot_color, None)
@@ -234,6 +244,7 @@ impl Network {
         renderer.draw_lines(&points, &draw_color, true);
     }
 
+    /// Draws a grid in the network editor.
     pub fn draw_grid(&self, renderer: &Renderer) {
         let mut points_v = Vec::new();
         let mut points_h = Vec::new();
@@ -274,8 +285,7 @@ impl Network {
             points_h.push(1.0);
         }
 
-        let mut draw_color = Color::from_hex(0x373737);
-        draw_color.a = 0.25;
+        let mut draw_color = Color::from_hex(0x373737, 0.25);
         renderer.draw_lines(&points_v, &draw_color, false);
         renderer.draw_lines(&points_h, &draw_color, false);
     }

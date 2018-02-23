@@ -72,6 +72,11 @@ impl ShaderBuilder {
             return min(a, b);
         }
 
+        float op_subtract(float a, float b)
+        {
+            return max(-a, b);
+        }
+
         float op_intersect(float a, float b)
         {
             return max(a, b);
@@ -101,7 +106,7 @@ impl ShaderBuilder {
 
         vec2 map(in vec3 p)
         {
-            // start of generated code
+            // start of generated cod-
         ";
 
         static FOOTER: &str = "
@@ -219,7 +224,10 @@ impl ShaderBuilder {
                         node.data.family.get_formatted(vec![node.data.name.clone()])
                     }
 
-                    OpType::Union | OpType::Intersection | OpType::SmoothMinimum => {
+                    OpType::Union
+                    | OpType::Subtraction
+                    | OpType::Intersection
+                    | OpType::SmoothMinimum => {
                         // If this operator doesn't have at least 2 inputs,
                         // then we exit early, since this isn't a valid
                         // shader graph.

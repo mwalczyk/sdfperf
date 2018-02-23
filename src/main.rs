@@ -36,7 +36,7 @@ use cgmath::{Vector2, Zero};
 
 fn clear() {
     unsafe {
-        let clear = Color::from_hex(0x2B2B2B);
+        let clear = Color::from_hex(0x2B2B2B, 1.0);
         gl::ClearColor(clear.r, clear.g, clear.b, clear.a);
         gl::Clear(gl::COLOR_BUFFER_BIT);
     }
@@ -134,6 +134,7 @@ fn main() {
                                         glutin::VirtualKeyCode::B => OpType::Box,
                                         glutin::VirtualKeyCode::P => OpType::Plane,
                                         glutin::VirtualKeyCode::U => OpType::Union,
+                                        glutin::VirtualKeyCode::D => OpType::Subtraction,
                                         glutin::VirtualKeyCode::I => OpType::Intersection,
                                         glutin::VirtualKeyCode::M => OpType::SmoothMinimum,
                                         glutin::VirtualKeyCode::R => OpType::Render,
