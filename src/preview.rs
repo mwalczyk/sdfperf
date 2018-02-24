@@ -1,10 +1,17 @@
-use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero};
+use gl;
+use gl::types::*;
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4,
+             Zero};
 
 use bounding_rect::BoundingRect;
 use color::Color;
 use interaction::MouseInfo;
 use program::Program;
 use renderer::Renderer;
+
+use std::mem;
+use std::ptr;
+use std::os::raw::c_void;
 
 #[derive(Copy, Clone)]
 pub enum Shading {
@@ -30,6 +37,8 @@ pub struct Preview {
     pitch: f32,
 
     shading: Shading,
+
+    ssbo: GLuint,
 }
 
 impl Preview {
@@ -71,6 +80,13 @@ impl Preview {
         let program_error =
             Program::new(FALLBACK_VS_SRC.to_string(), FALLBACK_FS_SRC.to_string()).unwrap();
 
+        let mut ssbo = 0;
+        unsafe {
+            let ssbo_size = (256 * mem::size_of::<Vector4<f32>>()) as GLsizeiptr;
+
+            gl::CreateBuffers(1, &mut ssbo);
+            gl::NamedBufferStorage(ssbo, ssbo_size, ptr::null(), gl::DYNAMIC_STORAGE_BIT);
+        }
         Preview {
             program_valid: None,
             program_error,
@@ -84,6 +100,7 @@ impl Preview {
             yaw: -90.0,
             pitch: 0.0,
             shading: Shading::Normals,
+            ssbo,
         }
     }
 
@@ -96,6 +113,19 @@ impl Preview {
     /// current graph.
     pub fn set_valid_program(&mut self, program: Option<Program>) {
         self.program_valid = program;
+    }
+
+    pub fn update_transforms(&self, data: Vec<Vector4<f32>>) {
+        unsafe {
+            let data_size = (data.len() * mem::size_of::<Vector4<f32>>()) as GLsizeiptr;
+            gl::NamedBufferSubData(self.ssbo, 0, data_size, data.as_ptr() as *const c_void);
+        }
+    }
+
+    pub fn bind_transforms(&self) {
+        unsafe {
+            gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 0, self.ssbo);
+        }
     }
 
     /// Sets the SDF shading mode.
@@ -159,6 +189,9 @@ impl Preview {
     /// network.
     pub fn draw(&self, renderer: &Renderer) {
         if let Some(ref program) = self.program_valid {
+            // Bind the SSBO of transform data.
+            self.bind_transforms();
+
             // Set the look-at matrix that will be used to construct
             // the virtual camera.
             program.uniform_matrix_4f("u_look_at_matrix", &self.look_at);

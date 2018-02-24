@@ -2,7 +2,7 @@ use bounding_rect::BoundingRect;
 use graph::Connected;
 use interaction::InteractionState;
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{Vector2, Vector3, Vector4};
 use uuid::Uuid;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -83,44 +83,31 @@ impl OpType {
         }
     }
 
-    pub fn get_unformatted(&self) -> String {
+    pub fn get_code_template(&self) -> String {
         // In all branches, `p` refers to the current position along the ray,
         // i.e. the variable used in the `map` function.
         match *self {
-            OpType::Sphere => "float {} = sdf_sphere(p, vec3(0.0), 1.0);".to_string(),
-            OpType::Box => "float {} = sdf_box(p, vec3(1.0));".to_string(),
-            OpType::Plane => "float {} = sdf_plane(p, -1.0);".to_string(),
-            OpType::Union => "float {} = op_union({}, {});".to_string(),
-            OpType::Subtraction => "float {} = op_subtract({}, {});".to_string(),
-            OpType::Intersection => "float {} = op_intersect({}, {});".to_string(),
-            OpType::SmoothMinimum => "float {} = op_smooth_min({}, {}, 1.0);".to_string(),
-            OpType::Render => "float {} = {};".to_string(),
+            OpType::Sphere => "
+                float s_NAME = transforms[INDEX].w;
+                vec3 t_NAME = transforms[INDEX].xyz;
+                float NAME = sdf_sphere(p / s_NAME + t_NAME, vec3(0.0), 1.0) * s_NAME;"
+                .to_string(),
+            OpType::Box => "
+                float s_NAME = transforms[INDEX].w;
+                vec3 t_NAME = transforms[INDEX].xyz;
+                float NAME = sdf_box(p / s_NAME + t_NAME, vec3(1.0)) * s_NAME;"
+                .to_string(),
+            OpType::Plane => "
+                float s_NAME = transforms[INDEX].w;
+                vec3 t_NAME = transforms[INDEX].xyz;
+                float NAME = sdf_plane(p / s_NAME + t_NAME, -1.0) * s_NAME;"
+                .to_string(),
+            OpType::Union => "float NAME = op_union(INPUT_A, INPUT_B);".to_string(),
+            OpType::Subtraction => "float NAME = op_subtract(INPUT_A, INPUT_B);".to_string(),
+            OpType::Intersection => "float NAME = op_intersect(INPUT_A, INPUT_B);".to_string(),
+            OpType::SmoothMinimum => "float NAME = op_smooth_min(INPUT_A, INPUT_B, 1.0);".to_string(),
+            OpType::Render => "float NAME = INPUT_A;".to_string(),
         }
-    }
-
-    /// Returns the number of `{}` entries in the unformatted shader code
-    /// corresponding to this op type.
-    pub fn get_number_of_entries(&self) -> usize {
-        match *self {
-            OpType::Sphere | OpType::Box | OpType::Plane => 1,
-            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => 3,
-            OpType::Render => 2,
-        }
-    }
-
-    pub fn get_formatted(&self, entries: Vec<String>) -> String {
-        if entries.len() != self.get_number_of_entries() {
-            panic!("Too few or too many entries passed to formatting function");
-        }
-
-        let mut formatted = self.get_unformatted();
-        for i in 0..self.get_number_of_entries() {
-            formatted = formatted.replacen("{}", &entries[i][..], 1);
-        }
-
-        formatted
-
-        //let indices: Vec<_> = self.get_unformatted_shader_code().match_indices("{}").collect();
     }
 }
 
@@ -151,6 +138,14 @@ pub struct Op {
 
     /// The op type
     pub family: OpType,
+
+    /// The transform (translation and scale) that will be applied to the
+    /// distance field represented by this op
+    pub transform: Vector4<f32>,
+
+    /// The index that will be used to grab this op's transform from the
+    /// GPU-side buffer
+    pub transform_index: usize,
 }
 
 impl Op {
@@ -193,6 +188,8 @@ impl Op {
             uuid: Uuid::new_v4(),
             name,
             family,
+            transform: Vector4::new(0.0, 0.0, 0.0, 1.0),
+            transform_index: count,
         }
     }
 
@@ -204,6 +201,10 @@ impl Op {
         self.aabb_slot_input.translate(offset);
         self.aabb_slot_output.translate(offset);
         self.aabb_icon.translate(offset);
+    }
+
+    pub fn set_transform(&mut self, transform: &Vector4<f32>) {
+        self.transform = *transform;
     }
 }
 

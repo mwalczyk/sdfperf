@@ -1,4 +1,4 @@
-use cgmath::{self, Vector2, Vector4, Zero};
+use cgmath::{self, Vector2, Vector3, Vector4, Zero};
 use uuid::Uuid;
 
 use color::Color;
@@ -124,6 +124,31 @@ impl Network {
     /// Toggles drawing of the preview window.
     pub fn toggle_preview(&mut self) {
         self.show_preview = !self.show_preview;
+    }
+
+    pub fn gather_transforms(&self) {
+        let mut transforms = Vec::new();
+        for node in self.graph.nodes.iter() {
+            transforms.push(node.data.transform);
+        }
+
+        self.preview.update_transforms(transforms);
+    }
+
+    pub fn scale_selected(&mut self, val: f32) {
+        if let Some(selected) = self.selection {
+            let node = self.graph.nodes.get_mut(selected).unwrap();
+            node.data.transform.w += val;
+        }
+    }
+
+    pub fn translate_selected(&mut self, val: &Vector3<f32>) {
+        if let Some(selected) = self.selection {
+            let node = self.graph.nodes.get_mut(selected).unwrap();
+            node.data.transform.x += val.x;
+            node.data.transform.y += val.y;
+            node.data.transform.z += val.z;
+        }
     }
 
     /// Deletes the currently selected op (if the selection is not empty).
@@ -298,6 +323,7 @@ impl Network {
         self.draw_all_ops(renderer);
 
         if self.show_preview {
+            self.gather_transforms();
             self.preview.draw(renderer);
         }
     }

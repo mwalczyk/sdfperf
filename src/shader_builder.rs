@@ -1,6 +1,7 @@
 use network::Network;
 use operator::{Op, OpType};
 use program::Program;
+use shader_string::ShaderString;
 
 use uuid::Uuid;
 
@@ -18,25 +19,6 @@ impl ShaderBuilder {
     /// Given a list of op indices in the proper post-order, builds
     /// and returns the appropriate shader code.
     pub fn build_sources(&mut self, network: &Network, indices: Vec<usize>) -> Option<Program> {
-        // TODO: each op will need something like this as part of its shader code
-        static TRANSFORMS: &str = "
-        struct transform
-        {
-            vec3 r; // rotation
-            vec3 s; // scale
-            vec3 t; // translation
-        }
-
-        uint sphere_id = 0;
-        vec3 r = ubo[sphere_id].r;
-        vec3 s = ubo[sphere_id].s;
-        vec3 t = ubo[sphere_id].t;
-
-        // do some stuff to transform `p`
-        float node = ...;
-        float sphere = sdf_sphere(node, vec3(0.0), 1.0);
-        ";
-
         static HEADER: &str = "
         #version 430
         layout (location = 0) in vec2 vs_texcoord;
@@ -45,10 +27,24 @@ impl ShaderBuilder {
         uniform mat4 u_look_at_matrix;
         uniform vec3 u_camera_position;
         uniform uint u_shading;
+        uniform float u_time;
+
+        // The SSBO that will contain a transform for each op in the
+        // graph. Note that according to the spec, there can only be
+        // one array of variable size per SSBO, which is why we use
+        // the convenience struct `transform` above.
+        //
+        // Here, we pack each transform into a single `vec4` where
+        // the xyz components represent a translation and the w
+        // component represents a uniform scale.
+        layout (std430, binding = 0) buffer transforms_block
+        {
+            vec4 transforms[];
+        };
 
         const uint MAX_STEPS = 128u;
         const float MAX_TRACE_DISTANCE = 32.0;
-        const float MIN_HIT_DISTANCE = 0.001;
+        const float MIN_HIT_DISTANCE = 0.01;
 
         struct ray
         {
@@ -122,6 +118,27 @@ impl ShaderBuilder {
             return normalize(n);
         }
 
+        float ambient_occlusion(in vec3 p, in vec3 n)
+        {
+            const float attenuation = 0.5;
+            float ao;
+            float accum = 0.0;
+            float scale = 1.0;
+            for(int step = 0; step < 5; step++)
+            {
+                float hr = 0.01 + 0.02 * float(step * step);
+                vec3 aopos = n * hr + p;
+
+                float dist = map(aopos).y;
+                ao = -(dist - hr);
+                accum += ao * scale;
+                scale *= attenuation;
+            }
+            ao = 1.0 - clamp(accum, 0.0, 1.0);
+
+            return ao;
+        }
+
         vec2 raymarch(in ray r)
         {
             float current_total_distance = 0.0;
@@ -168,7 +185,8 @@ impl ShaderBuilder {
                 {
                     const vec3 l = normalize(vec3(1.0, 5.0, 0.0));
                     float d = max(0.0, dot(n, l));
-                    return vec3(d);
+                    float ao = ambient_occlusion(hit, n);
+                    return vec3(pow(ao, 3.0));
                 }
                 else
                 {
@@ -217,11 +235,18 @@ impl ShaderBuilder {
         // Build the `map` function by traversing the graph of ops.
         for index in indices {
             if let Some(node) = network.graph.get_node(index) {
-                // Append this op's line of shader code with a leading
-                // tab and trailing newline.
+
                 let mut formatted = match node.data.family {
+
                     OpType::Sphere | OpType::Box | OpType::Plane => {
-                        node.data.family.get_formatted(vec![node.data.name.clone()])
+                        let shader_code = ShaderString::new(
+                            node.data.family.get_code_template(),
+                            &node.data.name,
+                            Some(node.data.transform_index),
+                            None,
+                            None,
+                        );
+                        shader_code.code
                     }
 
                     OpType::Union
@@ -234,41 +259,45 @@ impl ShaderBuilder {
                         if network.graph.edges[index].inputs.len() < 2 {
                             return None;
                         }
-                        let src_a = network.graph.edges[index].inputs[0];
-                        let src_b = network.graph.edges[index].inputs[1];
-                        node.data.family.get_formatted(vec![
-                            node.data.name.clone(),                                   // This op's name
-                            network.graph.get_node(src_a).unwrap().data.name.clone(), // The name of this op's 1st input
-                            network.graph.get_node(src_b).unwrap().data.name.clone(), // The name of this op's 2nd input
-                        ])
+                        let a = network.graph.edges[index].inputs[0];
+                        let b = network.graph.edges[index].inputs[1];
+                        let shader_code = ShaderString::new(
+                            node.data.family.get_code_template(),
+                            &node.data.name,
+                            Some(node.data.transform_index),
+                            Some(&network.graph.get_node(a).unwrap().data.name),
+                            Some(&network.graph.get_node(b).unwrap().data.name),
+                        );
+                        shader_code.code
                     }
 
                     OpType::Render => {
                         if network.graph.edges[index].inputs.len() < 1 {
                             return None;
                         }
-                        let src = network.graph.edges[index].inputs[0];
-                        let name = network.graph.get_node(src).unwrap().data.name.clone();
-                        let mut code = node.data.family.get_formatted(vec![
-                            node.data.name.clone(), // This op's name
-                            name,                   // The input op's name
-                        ]);
+                        let a = network.graph.edges[index].inputs[0];
+                        let mut shader_code = ShaderString::new(
+                            node.data.family.get_code_template(),
+                            &node.data.name,
+                            Some(node.data.transform_index),
+                            Some(&network.graph.get_node(a).unwrap().data.name),
+                            None,
+                        );
 
                         // Add the final `return` in the `map(..)` function.
-                        code.push('\n');
-                        code.push('\t');
-                        code.push_str(&format!("return vec2(0.0, {});", &node.data.name[..])[..]);
-
-                        code
+                        shader_code.code.push('\n');
+                        shader_code.code.push('\t');
+                        shader_code
+                            .code
+                            .push_str(&format!("return vec2(0.0, {});", &node.data.name));
+                        shader_code.code
                     }
-
-                    _ => "// empty".to_string(),
                 };
 
                 // Add a tab indent before each new line of shader code and a newline
                 // character after.
                 self.shader_code.push('\t');
-                self.shader_code.push_str(&formatted[..]);
+                self.shader_code.push_str(&formatted);
                 self.shader_code.push('\n');
             }
         }

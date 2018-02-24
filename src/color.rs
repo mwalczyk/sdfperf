@@ -73,10 +73,10 @@ impl Into<Vector4<f32>> for Color {
 
 #[test]
 fn test_white_hex() {
-    assert_eq!(Color::from_hex(0xFFFFFF), Color::white());
+    assert_eq!(Color::from_hex(0xFFFFFF, 1.0), Color::white());
 }
 
 #[test]
 fn test_black_hex() {
-    assert_eq!(Color::from_hex(0x000000), Color::black());
+    assert_eq!(Color::from_hex(0x000000, 1.0), Color::black());
 }

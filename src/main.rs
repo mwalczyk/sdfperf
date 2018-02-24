@@ -32,7 +32,7 @@ use renderer::Renderer;
 use shader_builder::ShaderBuilder;
 
 use glutin::GlContext;
-use cgmath::{Vector2, Zero};
+use cgmath::{Vector2, Vector3, Zero};
 
 fn clear() {
     unsafe {
@@ -162,6 +162,27 @@ fn main() {
                                         }
                                         glutin::VirtualKeyCode::Key3 => {
                                             network.preview.set_shading(Shading::Normals)
+                                        }
+                                        glutin::VirtualKeyCode::Equals => {
+                                            network.scale_selected(0.05);
+                                        }
+                                        glutin::VirtualKeyCode::Minus => {
+                                            network.scale_selected(-0.05);
+                                            //translate_selected
+                                        }
+                                        glutin::VirtualKeyCode::Left => {
+                                            network.translate_selected(&(Vector3::unit_x() * 0.05));
+                                        }
+                                        glutin::VirtualKeyCode::Right => {
+                                            network
+                                                .translate_selected(&(Vector3::unit_x() * -0.05));
+                                        }
+                                        glutin::VirtualKeyCode::Up => {
+                                            network
+                                                .translate_selected(&(Vector3::unit_y() * -0.05));
+                                        }
+                                        glutin::VirtualKeyCode::Down => {
+                                            network.translate_selected(&(Vector3::unit_y() * 0.05));
                                         }
                                         _ => (),
                                     }

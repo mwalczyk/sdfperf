@@ -316,6 +316,7 @@ impl Renderer {
         // First, set all relevant uniforms.
         program.uniform_matrix_4f("u_model_matrix", &rect.get_model_matrix());
         program.uniform_matrix_4f("u_projection_matrix", &self.projection);
+        program.uniform_1f("u_time", self.get_elapsed_seconds());
 
         // Next, issue a draw call.
         unsafe {
