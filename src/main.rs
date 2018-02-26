@@ -211,7 +211,7 @@ fn main() {
         }
 
         // Draw the graph (ops, connections, preview window, etc.).
-        network.draw(&renderer);
+        network.draw(&mut renderer);
 
         gl_window.swap_buffers().unwrap();
     }

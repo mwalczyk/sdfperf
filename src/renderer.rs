@@ -21,7 +21,7 @@ pub enum Alpha {
 
 pub struct Renderer {
     /// The OpenGL handle of the currently bound program (if there is one)
-    bound_program: Option<GLuint>,
+    bound_programs: Vec<GLuint>,
 
     /// The OpenGL handle of the currently bound VAO (if there is one)
     bound_vao: Option<GLuint>,
@@ -198,7 +198,7 @@ impl Renderer {
         }
 
         let mut renderer = Renderer {
-            bound_program: None,
+            bound_programs: Vec::new(),
             bound_vao: None,
             program_draw,
             projection: Matrix4::zero(),
@@ -250,24 +250,23 @@ impl Renderer {
             .uniform_matrix_4f("u_projection_matrix", &self.projection);
     }
 
-    pub fn conditionally_bind(&mut self, id: GLuint) -> bool {
-        // Is there currently a bound program?
-        if let Some(bound_id) = self.bound_program {
-            // Is the bound program's handle different than
-            // the program in question?
-            if bound_id != id {
-                self.bound_program = Some(id);
-                return true;
-            } else {
-                return false;
+    pub fn conditionally_bind(&mut self, id: GLuint) {
+        let mut needs_update = true;
+
+        if let Some(bound) = self.bound_programs.last() {
+            if *bound == id {
+                needs_update = false;
             }
         }
-        self.bound_program = Some(id);
-        true
+
+        if needs_update {
+            self.program_draw.bind();
+            self.bound_programs.push(id);
+        }
     }
 
     /// Draws the rectangle described by `rect`, with solid `color`.
-    pub fn draw_rect(&self, rect: &BoundingRect, color: &Color, tex: Option<&Texture>) {
+    pub fn draw_rect(&mut self, rect: &BoundingRect, color: &Color, tex: Option<&Texture>) {
         self.program_draw.bind();
 
         // First, set all relevant uniforms.

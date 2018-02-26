@@ -24,6 +24,10 @@ impl ShaderString {
 
         ShaderString { code }
     }
+
+    pub fn to_string(self) -> String {
+        self.code
+    }
 }
 
 #[test]

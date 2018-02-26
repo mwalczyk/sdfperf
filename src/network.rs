@@ -198,7 +198,7 @@ impl Network {
     }
 
     /// Draws a single op in the network.
-    fn draw_op(&self, op: &Op, renderer: &Renderer) {
+    fn draw_op(&self, op: &Op, renderer: &mut Renderer) {
         // Draw the op and other components:
         // - If the op is selected, draw a selection box behind it
         // - If the op is being used as a connection source or
@@ -229,14 +229,14 @@ impl Network {
     }
 
     /// Draws all ops in the network.
-    fn draw_all_ops(&self, renderer: &Renderer) {
+    fn draw_all_ops(&self, renderer: &mut Renderer) {
         for node in self.graph.get_nodes().iter() {
             self.draw_op(&node.data, renderer);
         }
     }
 
     /// Draws all edges between ops in the network.
-    fn draw_all_edges(&self, renderer: &Renderer) {
+    fn draw_all_edges(&self, renderer: &mut Renderer) {
         let mut points = Vec::new();
 
         for (src, edges) in self.graph.edges.iter().enumerate() {
@@ -270,7 +270,7 @@ impl Network {
     }
 
     /// Draws a grid in the network editor.
-    pub fn draw_grid(&self, renderer: &Renderer) {
+    pub fn draw_grid(&self, renderer: &mut Renderer) {
         let mut points_v = Vec::new();
         let mut points_h = Vec::new();
 
@@ -317,7 +317,7 @@ impl Network {
 
     /// Draws all of the operators and edges that make
     /// up this graph.
-    pub fn draw(&self, renderer: &Renderer) {
+    pub fn draw(&self, renderer: &mut Renderer) {
         self.draw_grid(renderer);
         self.draw_all_edges(renderer);
         self.draw_all_ops(renderer);

@@ -26,6 +26,7 @@ impl ShaderBuilder {
 
         uniform mat4 u_look_at_matrix;
         uniform vec3 u_camera_position;
+        uniform vec3 u_camera_front;
         uniform uint u_shading;
         uniform float u_time;
 
@@ -195,17 +196,35 @@ impl ShaderBuilder {
             }
         }
 
-        void main()
+        ray generate_ray()
         {
+            // uv-coordinates in the range [-1..1]
             vec2 uv = vs_texcoord * 2.0 - 1.0;
 
-            mat3 lookat = mat3(u_look_at_matrix);
+            const float PI = 3.14159265359;
+            const float fov = 50.0;
+            const float fovx = PI * fov / 360.0;
+            float fovy = fovx * 1.0; // iResolution.y/iResolution.x;
+            float ulen = tan(fovx);
+            float vlen = tan(fovy);
+
+            const vec3 camera_up = vec3(0.0, 1.0, 0.0);
+            vec2 cam_uv = uv;
+            vec3 camera_right = normalize(cross(camera_up, u_camera_front));
+            vec3 pixel = u_camera_position + u_camera_front + camera_right * cam_uv.x * ulen + camera_up * cam_uv.y * vlen;
+
             vec3 ro = u_camera_position;
-            vec3 rd = normalize(lookat * vec3(uv.xy, -1.0));
-            ray r = ray(ro, rd);
+            vec3 rd = normalize(pixel - u_camera_position);
+
+            return ray(ro, rd);
+        }
+
+        void main()
+        {
+            ray r = generate_ray();
 
             vec2 res = raymarch(r);
-            vec3 hit = ro + rd * res.y;
+            vec3 hit = r.o + r.d * res.y;
 
             const vec3 background = vec3(0.0);
             vec3 color = vec3(0.0);
@@ -246,7 +265,7 @@ impl ShaderBuilder {
                             None,
                             None,
                         );
-                        shader_code.code
+                        shader_code.to_string()
                     }
 
                     OpType::Union
@@ -268,7 +287,7 @@ impl ShaderBuilder {
                             Some(&network.graph.get_node(a).unwrap().data.name),
                             Some(&network.graph.get_node(b).unwrap().data.name),
                         );
-                        shader_code.code
+                        shader_code.to_string()
                     }
 
                     OpType::Render => {
@@ -290,7 +309,7 @@ impl ShaderBuilder {
                         shader_code
                             .code
                             .push_str(&format!("return vec2(0.0, {});", &node.data.name));
-                        shader_code.code
+                        shader_code.to_string()
                     }
                 };
 

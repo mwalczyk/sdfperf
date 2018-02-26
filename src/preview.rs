@@ -32,6 +32,8 @@ pub struct Preview {
 
     camera_position: Point3<f32>,
 
+    camera_front: Vector3<f32>,
+
     yaw: f32,
 
     pitch: f32,
@@ -97,6 +99,7 @@ impl Preview {
                 Vector3::unit_y(),
             ),
             camera_position: Point3::new(0.0, 0.0, 3.0),
+            camera_front: Vector3::new(0.0, 0.0, -1.0),
             yaw: -90.0,
             pitch: 0.0,
             shading: Shading::Normals,
@@ -143,7 +146,7 @@ impl Preview {
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
         // Rebuilds the look-at matrix based on mouse events.
         if self.aabb.inside(&mouse.curr) {
-            let mut front = Vector3::zero();
+            self.camera_front = Vector3::zero();
             let offset = mouse.curr - mouse.last;
             const ROTATION_SENSITIVITY: f32 = 0.25;
             const TRANSLATION_SENSITIVITY: f32 = 0.005;
@@ -160,25 +163,25 @@ impl Preview {
             // Based on the Euler angles calculated above,
             // create the virtual camera's "front" (forward-facing)
             // vector.
-            front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
-            front.y = self.pitch.to_radians().sin();
-            front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
-            front.normalize();
+            self.camera_front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
+            self.camera_front.y = self.pitch.to_radians().sin();
+            self.camera_front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
+            self.camera_front = self.camera_front.normalize();
 
             // TODO: this isn't working.
             // Handle camera translation.
             if mouse.rdown {
                 // Strafe left and right.
                 self.camera_position +=
-                    front.cross(Vector3::unit_y()).normalize() * offset.x * TRANSLATION_SENSITIVITY;
+                    self.camera_front.cross(Vector3::unit_y()).normalize() * offset.x * TRANSLATION_SENSITIVITY;
 
                 // Move forward and backwards.
-                self.camera_position += front * offset.y * TRANSLATION_SENSITIVITY;
+                self.camera_position += self.camera_front * offset.y * TRANSLATION_SENSITIVITY;
             }
 
             self.look_at = Matrix4::look_at(
                 self.camera_position,
-                self.camera_position + front,
+                self.camera_position + self.camera_front,
                 Vector3::unit_y(),
             );
         }
@@ -196,6 +199,7 @@ impl Preview {
             // the virtual camera.
             program.uniform_matrix_4f("u_look_at_matrix", &self.look_at);
             program.uniform_3f("u_camera_position", &self.camera_position.to_vec());
+            program.uniform_3f("u_camera_front", &self.camera_front);
             program.uniform_1ui("u_shading", self.shading as u32);
             renderer.draw_rect_with_program(&self.aabb, program);
         } else {

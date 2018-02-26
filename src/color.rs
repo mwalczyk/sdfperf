@@ -20,9 +20,9 @@ impl Color {
     }
 
     pub fn from_hex(code: u32, alpha: f32) -> Color {
-        let r = ((code >> 16) & 0xFF) as f32 / 255.0; // Extract the RR byte
-        let g = ((code >> 8) & 0xFF) as f32 / 255.0; // Extract the GG byte
-        let b = ((code) & 0xFF) as f32 / 255.0; // Extract the BB byte
+        let r = ((code >> 16) & 0xFF) as f32 / 255.0;
+        let g = ((code >> 8) & 0xFF) as f32 / 255.0;
+        let b = ((code) & 0xFF) as f32 / 255.0;
         Color::new(r, g, b, alpha)
     }
 
