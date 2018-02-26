@@ -155,12 +155,15 @@ fn main() {
                                         }
                                         glutin::VirtualKeyCode::P => network.toggle_preview(),
                                         glutin::VirtualKeyCode::Key1 => {
-                                            network.preview.set_shading(Shading::Diffuse)
+                                            network.preview.set_shading(Shading::Depth)
                                         }
                                         glutin::VirtualKeyCode::Key2 => {
-                                            network.preview.set_shading(Shading::Constant)
+                                            network.preview.set_shading(Shading::Steps)
                                         }
                                         glutin::VirtualKeyCode::Key3 => {
+                                            network.preview.set_shading(Shading::AmbientOcclusion)
+                                        }
+                                        glutin::VirtualKeyCode::Key4 => {
                                             network.preview.set_shading(Shading::Normals)
                                         }
                                         glutin::VirtualKeyCode::Equals => {

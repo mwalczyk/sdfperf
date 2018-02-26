@@ -16,8 +16,9 @@ use std::os::raw::c_void;
 #[derive(Copy, Clone)]
 pub enum Shading {
     // TODO: eventually, these could be structs with memebers like `color`
-    Diffuse,
-    Constant,
+    Depth,
+    Steps,
+    AmbientOcclusion,
     Normals,
 }
 
@@ -147,9 +148,9 @@ impl Preview {
         // Rebuilds the look-at matrix based on mouse events.
         if self.aabb.inside(&mouse.curr) {
             self.camera_front = Vector3::zero();
-            let offset = mouse.curr - mouse.last;
+            let offset = mouse.last - mouse.curr;
             const ROTATION_SENSITIVITY: f32 = 0.25;
-            const TRANSLATION_SENSITIVITY: f32 = 0.005;
+            const TRANSLATION_SENSITIVITY: f32 = 0.01;
 
             // Handle camera rotation.
             if mouse.ldown {
@@ -168,7 +169,6 @@ impl Preview {
             self.camera_front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
             self.camera_front = self.camera_front.normalize();
 
-            // TODO: this isn't working.
             // Handle camera translation.
             if mouse.rdown {
                 // Strafe left and right.

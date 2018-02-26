@@ -43,9 +43,9 @@ impl ShaderBuilder {
             vec4 transforms[];
         };
 
-        const uint MAX_STEPS = 128u;
-        const float MAX_TRACE_DISTANCE = 32.0;
-        const float MIN_HIT_DISTANCE = 0.01;
+        const int MAX_STEPS = 128;
+        const float MAX_TRACE_DISTANCE = 64.0;
+        const float MIN_HIT_DISTANCE = 0.001;
 
         struct ray
         {
@@ -53,14 +53,18 @@ impl ShaderBuilder {
             vec3 d;
         };
 
-        // This will typically be provided by the application,
-        // but we leave this function here just in case.
+        struct result
+        {
+            float id;
+            float total_distance;
+            int total_steps;
+        };
+
         mat3 lookat(in vec3 t, in vec3 p)
         {
             vec3 k = normalize(t - p);
             vec3 i = cross(k, vec3(0.0, 1.0, 0.0));
             vec3 j = cross(i, k);
-
             return mat3(i, j, k);
         }
 
@@ -140,49 +144,69 @@ impl ShaderBuilder {
             return ao;
         }
 
-        vec2 raymarch(in ray r)
+        result raymarch(in ray r)
         {
-            float current_total_distance = 0.0;
-            float current_id = -1.0;
-
-            for (uint i = 0u; i < MAX_STEPS; ++i)
+            result res = result(-1.0, 0.0, 0);
+            for (int i = 0; i < MAX_STEPS; ++i)
             {
-                vec3 p = r.o + current_total_distance * r.d;
+                vec3 p = r.o + r.d * res.total_distance;
                 vec2 hit_info = map(p);
-                float id = hit_info.x;
-                float dist = hit_info.y;
+                float hit_id = hit_info.x;
+                float hit_dist = hit_info.y;
+                res.total_distance += hit_dist;
 
-                current_total_distance += dist;
-
-                if (dist < MIN_HIT_DISTANCE)
+                if (hit_dist < MIN_HIT_DISTANCE)
                 {
-                    current_id = id;
+                    res.id = hit_id;
                     break;
                 }
 
-                if(current_total_distance > MAX_TRACE_DISTANCE)
+                if(res.total_distance > MAX_TRACE_DISTANCE)
                 {
-                    current_total_distance = 0.0;
+                    res.total_distance = 0.0;
                     break;
                 }
+
+                res.total_steps++;
             }
-            return vec2(current_id, current_total_distance);
+            return res;
         }
 
-        const uint SHADING_CONSTANT = 0;
-        const uint SHADING_DIFFUSE = 1;
-        const uint SHADING_NORMALS = 2;
-        vec3 shading(in vec3 hit)
+        const uint SHADING_DEPTH = 0;
+        const uint SHADING_STEPS = 1;
+        const uint SHADING_AMBIENT_OCCLUSION = 2;
+        const uint SHADING_NORMALS = 3;
+        vec3 shading(in ray r, in result res)
         {
-            if (u_shading == 0)
+            vec3 hit = r.o + r.d * res.total_distance;
+            if (u_shading == SHADING_DEPTH)
             {
-                return vec3(1.0);
+                float depth = hit.z / MAX_TRACE_DISTANCE;
+                return vec3(pow(depth, 0.5));
+            }
+            else if (u_shading == SHADING_STEPS)
+            {
+                float pct = float(res.total_steps) / MAX_STEPS;
+                const vec3 c_a = vec3(0.0, 0.0, 1.0);
+                const vec3 c_b = vec3(0.0, 1.0, 1.0);
+                const vec3 c_c = vec3(1.0, 1.0, 0.0);
+                const vec3 c_d = vec3(1.0, 0.0, 0.0);
+
+                const float a = 0.00;
+                const float b = 0.33;
+                const float c = 0.66;
+                const float d = 1.00;
+
+                vec3 color = mix(c_a, c_b, smoothstep(a, b, pct));
+                color = mix(color, c_c, smoothstep(b, c, pct));
+                color = mix(color, c_d, smoothstep(c, d, pct));
+                return color;
             }
             else
             {
                 // calculate normals
                 vec3 n = calculate_normal(hit);
-                if (u_shading == SHADING_DIFFUSE)
+                if (u_shading == SHADING_AMBIENT_OCCLUSION)
                 {
                     const vec3 l = normalize(vec3(1.0, 5.0, 0.0));
                     float d = max(0.0, dot(n, l));
@@ -222,16 +246,14 @@ impl ShaderBuilder {
         void main()
         {
             ray r = generate_ray();
-
-            vec2 res = raymarch(r);
-            vec3 hit = r.o + r.d * res.y;
+            result res = raymarch(r);
 
             const vec3 background = vec3(0.0);
-            vec3 color = vec3(0.0);
-            switch(int(res.x))
+            vec3 color = background;
+            switch(int(res.id))
             {
                 case 0:
-                    color = shading(hit);
+                    color = shading(r, res);
                     break;
                 case 1:
                     // Placeholder
