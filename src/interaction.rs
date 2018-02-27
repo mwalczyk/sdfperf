@@ -1,5 +1,7 @@
 use cgmath::{Vector2, Zero};
 
+use bounding_rect::BoundingRect;
+
 pub struct MouseInfo {
     /// The current position of the mouse
     pub curr: Vector2<f32>,
@@ -52,12 +54,30 @@ pub enum InteractionState {
     // TODO: change these to `DragFrom` and `DragTo` or `Drag` and `Drop`
 }
 
-/// A trait that represents a view or region that the
-/// user can interact with.
-trait Panel {
-    fn mouse_pressed(&self);
-    fn mouse_release(&self);
-    fn mouse_entered(&self);
-    fn mouse_exited(&self);
-    fn handle_interaction(&mut self, info: &MouseInfo);
+/// A trait that represents a rectangular region of the
+/// display window that the user can interact with.
+pub trait Panel {
+    /// Returns the bounding rectangular defined by this panel.
+    fn get_bounds(&self) -> &BoundingRect;
+
+    /// Returns an immutable pointer to a list of all of this
+    /// panel's children.
+    fn get_children(&self) -> &Vec<Box<Panel>>;
+
+    /// Returns a mutable pointer to a list of all of this
+    /// panel's children.
+    fn get_children_mut(&mut self) -> &mut Vec<Box<Panel>>;
+
+    /// Returns `true` if this panel has at least one child and
+    /// `false` otherwise.
+    fn has_children(&self) -> bool {
+        !self.get_children().is_empty()
+    }
+
+    /// Handles any mouse events.
+    fn handle_interaction(&mut self, info: &MouseInfo) {
+        for child in self.get_children_mut() {
+            child.handle_interaction(info);
+        }
+    }
 }

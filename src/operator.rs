@@ -105,10 +105,17 @@ impl OpType {
             OpType::Union => "float NAME = op_union(INPUT_A, INPUT_B);".to_string(),
             OpType::Subtraction => "float NAME = op_subtract(INPUT_A, INPUT_B);".to_string(),
             OpType::Intersection => "float NAME = op_intersect(INPUT_A, INPUT_B);".to_string(),
-            OpType::SmoothMinimum => "float NAME = op_smooth_min(INPUT_A, INPUT_B, 1.0);".to_string(),
+            OpType::SmoothMinimum => {
+                "float NAME = op_smooth_min(INPUT_A, INPUT_B, 1.0);".to_string()
+            }
             OpType::Render => "float NAME = INPUT_A;".to_string(),
         }
     }
+}
+
+pub enum Slot {
+    Input(BoundingRect),
+    Output(BoundingRect)
 }
 
 pub struct Op {

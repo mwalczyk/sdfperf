@@ -71,7 +71,7 @@ impl Renderer {
         ];
 
         static DRAW_VS_SRC: &'static str = "
-        #version 430
+        #version 450
 
         layout(location = 0) in vec2 position;
         layout(location = 1) in vec2 texcoord;
@@ -87,7 +87,7 @@ impl Renderer {
         }";
 
         static DRAW_FS_SRC: &'static str = "
-        #version 430
+        #version 450
 
         uniform float u_time;
         uniform vec4 u_draw_color = vec4(1.0);
@@ -99,11 +99,13 @@ impl Renderer {
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
 
+        const uint DRAW_MODE_RECTANGLES = 0;
+        const uint DRAW_MODE_LINES = 1;
         void main() {
             vec2 uv = vs_texcoord;
 
             const float stripes = 20.0;
-            float alpha = u_draw_mode == 0 ? u_draw_color.a : max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
+            float alpha = u_draw_mode == DRAW_MODE_RECTANGLES ? u_draw_color.a : max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
 
             if (u_use_maps)
             {
@@ -150,14 +152,10 @@ impl Renderer {
             );
 
             // This is not strictly necessary, but we do it for completeness sake.
-            let pos_attr = gl::GetAttribLocation(
-                program_draw.program_id,
-                CString::new("position").unwrap().as_ptr(),
-            );
-            let tex_attr = gl::GetAttribLocation(
-                program_draw.program_id,
-                CString::new("texcoord").unwrap().as_ptr(),
-            );
+            let pos_attr =
+                gl::GetAttribLocation(program_draw.id, CString::new("position").unwrap().as_ptr());
+            let tex_attr =
+                gl::GetAttribLocation(program_draw.id, CString::new("texcoord").unwrap().as_ptr());
             let tex_offset = (2 * mem::size_of::<GLfloat>()) as GLuint;
 
             // Create the VAO and setup vertex attributes.

@@ -14,9 +14,9 @@ pub struct UniformEntry {
 }
 
 pub struct Program {
-    pub program_id: GLuint,
-    vert_shader_src: String,
-    frag_shader_src: String,
+    pub id: GLuint,
+    vs_src: String,
+    fs_src: String,
 }
 
 impl Program {
@@ -102,30 +102,43 @@ impl Program {
 
     fn perform_reflection(src: &str) {}
 
-    pub fn new(vert_shader_src: String, frag_shader_src: String) -> Option<Program> {
+    pub fn new(vs_src: String, fs_src: String) -> Option<Program> {
         // Make sure that compiling each of the shaders was successful.
-        if let (Ok(vs_id), Ok(fs_id)) = (
-            Program::compile_shader(&vert_shader_src, gl::VERTEX_SHADER),
-            Program::compile_shader(&frag_shader_src, gl::FRAGMENT_SHADER),
-        ) {
-            // Make sure that linking the shader program was successful.
-            if let Ok(program_id) = Program::link_program(vs_id, fs_id) {
-                // If everything went ok, return the shader program.
-                return Some(Program {
-                    program_id,
-                    vert_shader_src,
-                    frag_shader_src,
-                });
+        let compile_vs_res = Program::compile_shader(&vs_src, gl::VERTEX_SHADER);
+        let compile_fs_res = Program::compile_shader(&fs_src, gl::FRAGMENT_SHADER);
+
+        match (compile_vs_res, compile_fs_res) {
+            (Ok(vs_id), Ok(fs_id)) => {
+                // Make sure that linking the shader program was successful.
+                if let Ok(id) = Program::link_program(vs_id, fs_id) {
+                    // If everything went ok, return the shader program.
+                    return Some(Program { id, vs_src, fs_src });
+                } else {
+                    return None;
+                }
+            }
+            // Both shader stages resulted in an error.
+            (Err(vs_err), Err(fs_err)) => {
+                println!("{}", vs_err);
+                println!("{}", fs_err);
+                return None;
+            }
+            // The vertex shader resulted in an error.
+            (Err(vs_err), Ok(_)) => {
+                println!("{}", vs_err);
+                return None;
+            }
+            // The fragment shader resulted in an error.
+            (Ok(_), Err(fs_err)) => {
+                println!("{}", fs_err);
+                return None;
             }
         }
-
-        // Otherwise, something failed: return `None`.
-        None
     }
 
     pub fn bind(&self) {
         unsafe {
-            gl::UseProgram(self.program_id);
+            gl::UseProgram(self.id);
         }
     }
 
@@ -137,57 +150,50 @@ impl Program {
 
     pub fn uniform_1i(&self, name: &str, value: i32) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniform1i(self.program_id, location, value as gl::types::GLint);
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform1i(self.id, location, value as gl::types::GLint);
         }
     }
 
     pub fn uniform_1ui(&self, name: &str, value: u32) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniform1ui(self.program_id, location, value as gl::types::GLuint);
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform1ui(self.id, location, value as gl::types::GLuint);
         }
     }
 
     pub fn uniform_1f(&self, name: &str, value: f32) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniform1f(self.program_id, location, value as gl::types::GLfloat);
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform1f(self.id, location, value as gl::types::GLfloat);
         }
     }
 
     pub fn uniform_2f(&self, name: &str, value: &cgmath::Vector2<f32>) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniform2fv(self.program_id, location, 1, value.as_ptr());
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform2fv(self.id, location, 1, value.as_ptr());
         }
     }
 
     pub fn uniform_3f(&self, name: &str, value: &cgmath::Vector3<f32>) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniform3fv(self.program_id, location, 1, value.as_ptr());
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform3fv(self.id, location, 1, value.as_ptr());
         }
     }
 
     pub fn uniform_4f(&self, name: &str, value: &cgmath::Vector4<f32>) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniform4fv(self.program_id, location, 1, value.as_ptr());
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform4fv(self.id, location, 1, value.as_ptr());
         }
     }
 
     pub fn uniform_matrix_4f(&self, name: &str, value: &cgmath::Matrix4<f32>) {
         unsafe {
-            let location =
-                gl::GetUniformLocation(self.program_id, CString::new(name).unwrap().as_ptr());
-            gl::ProgramUniformMatrix4fv(self.program_id, location, 1, gl::FALSE, value.as_ptr());
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniformMatrix4fv(self.id, location, 1, gl::FALSE, value.as_ptr());
         }
     }
 }
@@ -195,7 +201,7 @@ impl Program {
 impl Drop for Program {
     fn drop(&mut self) {
         unsafe {
-            gl::DeleteProgram(self.program_id);
+            gl::DeleteProgram(self.id);
         }
     }
 }

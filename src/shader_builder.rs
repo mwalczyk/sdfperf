@@ -12,7 +12,7 @@ pub struct ShaderBuilder {
 impl ShaderBuilder {
     pub fn new() -> ShaderBuilder {
         ShaderBuilder {
-            shader_code: "".to_string(),
+            shader_code: String::new(),
         }
     }
 
@@ -20,11 +20,11 @@ impl ShaderBuilder {
     /// and returns the appropriate shader code.
     pub fn build_sources(&mut self, network: &Network, indices: Vec<usize>) -> Option<Program> {
         static HEADER: &str = "
-        #version 430
+        #version 450
+
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
 
-        uniform mat4 u_look_at_matrix;
         uniform vec3 u_camera_position;
         uniform vec3 u_camera_front;
         uniform uint u_shading;
@@ -271,14 +271,12 @@ impl ShaderBuilder {
         }";
 
         // Clear the cached shader code (if there was any).
-        self.shader_code = "".to_string();
+        self.shader_code = String::new();
 
         // Build the `map` function by traversing the graph of ops.
         for index in indices {
             if let Some(node) = network.graph.get_node(index) {
-
                 let mut formatted = match node.data.family {
-
                     OpType::Sphere | OpType::Box | OpType::Plane => {
                         let shader_code = ShaderString::new(
                             node.data.family.get_code_template(),
@@ -300,6 +298,7 @@ impl ShaderBuilder {
                         if network.graph.edges[index].inputs.len() < 2 {
                             return None;
                         }
+
                         let a = network.graph.edges[index].inputs[0];
                         let b = network.graph.edges[index].inputs[1];
                         let shader_code = ShaderString::new(
@@ -313,9 +312,13 @@ impl ShaderBuilder {
                     }
 
                     OpType::Render => {
+                        // If this operator doesn't have at least 1 input,
+                        // then we exit early, since this isn't a valid
+                        // shader graph.
                         if network.graph.edges[index].inputs.len() < 1 {
                             return None;
                         }
+
                         let a = network.graph.edges[index].inputs[0];
                         let mut shader_code = ShaderString::new(
                             node.data.family.get_code_template(),
@@ -351,12 +354,15 @@ impl ShaderBuilder {
         println!("{}", self.shader_code);
 
         let vs_src = "
-        #version 430
+        #version 450
+
         layout(location = 0) in vec2 position;
         layout(location = 1) in vec2 texcoord;
         layout (location = 0) out vec2 vs_texcoord;
+
         uniform mat4 u_model_matrix;
         uniform mat4 u_projection_matrix;
+
         void main() {
             vs_texcoord = texcoord;
 

@@ -23,7 +23,7 @@ mod shader_string;
 mod texture;
 
 use color::Color;
-use interaction::MouseInfo;
+use interaction::{MouseInfo, Panel};
 use operator::{Op, OpType};
 use network::Network;
 use preview::Shading;

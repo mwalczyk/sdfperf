@@ -5,7 +5,7 @@ use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2,
 
 use bounding_rect::BoundingRect;
 use color::Color;
-use interaction::MouseInfo;
+use interaction::{MouseInfo, Panel};
 use program::Program;
 use renderer::Renderer;
 
@@ -15,11 +15,59 @@ use std::os::raw::c_void;
 
 #[derive(Copy, Clone)]
 pub enum Shading {
-    // TODO: eventually, these could be structs with memebers like `color`
     Depth,
     Steps,
     AmbientOcclusion,
     Normals,
+}
+
+struct VirtualCamera {
+    /// The position of the camera
+    position: Point3<f32>,
+
+    /// The up vector of the camera
+    up: Vector3<f32>,
+
+    /// The direction that the camera is currently facing
+    front: Vector3<f32>,
+
+    /// The cross product of this camera's `up` and `front` vectors
+    right: Vector3<f32>,
+
+    /// The vertical angle of the camera
+    pitch: f32,
+
+    /// The horizontal angle of the camera
+    yaw: f32,
+}
+
+impl VirtualCamera {
+    fn new() -> VirtualCamera {
+        VirtualCamera {
+            position: Point3::new(0.0, 0.0, 5.0),
+            up: Vector3::unit_y(),
+            front: Vector3::new(0.0, 0.0, -1.0),
+            right: Vector3::unit_x(),
+            pitch: 0.0,
+            yaw: -90.0,
+        }
+    }
+
+    fn home(&mut self) {
+        self.position = Point3::new(0.0, 0.0, 5.0);
+        self.pitch = 0.0;
+        self.yaw = -90.0;
+    }
+
+    fn rebuild_front(&mut self) {
+        self.front = Vector3::new(
+            self.yaw.to_radians().cos() * self.pitch.to_radians().cos(),
+            self.pitch.to_radians().sin(),
+            self.yaw.to_radians().sin() * self.pitch.to_radians().cos(),
+        ).normalize();
+
+        self.right = self.front.cross(self.up).normalize()
+    }
 }
 
 pub struct Preview {
@@ -29,15 +77,7 @@ pub struct Preview {
 
     aabb: BoundingRect,
 
-    look_at: Matrix4<f32>,
-
-    camera_position: Point3<f32>,
-
-    camera_front: Vector3<f32>,
-
-    yaw: f32,
-
-    pitch: f32,
+    camera: VirtualCamera,
 
     shading: Shading,
 
@@ -69,7 +109,7 @@ impl Preview {
         layout (location = 0) out vec4 o_color;
 
         void main() {
-            const float tile = 10.0;
+            const float tile = 15.0;
             vec2 uv = vs_texcoord * tile;
             vec2 ipos = floor(uv);
 
@@ -94,15 +134,7 @@ impl Preview {
             program_valid: None,
             program_error,
             aabb: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
-            look_at: Matrix4::look_at(
-                Point3::new(0.0, 0.0, 3.0),
-                Point3::new(0.0, 0.0, 0.0),
-                Vector3::unit_y(),
-            ),
-            camera_position: Point3::new(0.0, 0.0, 3.0),
-            camera_front: Vector3::new(0.0, 0.0, -1.0),
-            yaw: -90.0,
-            pitch: 0.0,
+            camera: VirtualCamera::new(),
             shading: Shading::Normals,
             ssbo,
         }
@@ -126,12 +158,6 @@ impl Preview {
         }
     }
 
-    pub fn bind_transforms(&self) {
-        unsafe {
-            gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 0, self.ssbo);
-        }
-    }
-
     /// Sets the SDF shading mode.
     pub fn set_shading(&mut self, shading: Shading) {
         self.shading = shading;
@@ -139,52 +165,7 @@ impl Preview {
 
     /// Homes the virtual preview camera.
     pub fn home(&mut self) {
-        self.yaw = -90.0;
-        self.pitch = 0.0;
-        self.camera_position = Point3::new(0.0, 0.0, 3.0);
-    }
-
-    pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
-        // Rebuilds the look-at matrix based on mouse events.
-        if self.aabb.inside(&mouse.curr) {
-            self.camera_front = Vector3::zero();
-            let offset = mouse.last - mouse.curr;
-            const ROTATION_SENSITIVITY: f32 = 0.25;
-            const TRANSLATION_SENSITIVITY: f32 = 0.01;
-
-            // Handle camera rotation.
-            if mouse.ldown {
-                self.yaw += offset.x * ROTATION_SENSITIVITY;
-                self.pitch += offset.y * ROTATION_SENSITIVITY;
-
-                // Prevent the screen from flipping.
-                self.pitch.min(89.0).max(-89.0);
-            }
-
-            // Based on the Euler angles calculated above,
-            // create the virtual camera's "front" (forward-facing)
-            // vector.
-            self.camera_front.x = self.yaw.to_radians().cos() * self.pitch.to_radians().cos();
-            self.camera_front.y = self.pitch.to_radians().sin();
-            self.camera_front.z = self.yaw.to_radians().sin() * self.pitch.to_radians().cos();
-            self.camera_front = self.camera_front.normalize();
-
-            // Handle camera translation.
-            if mouse.rdown {
-                // Strafe left and right.
-                self.camera_position +=
-                    self.camera_front.cross(Vector3::unit_y()).normalize() * offset.x * TRANSLATION_SENSITIVITY;
-
-                // Move forward and backwards.
-                self.camera_position += self.camera_front * offset.y * TRANSLATION_SENSITIVITY;
-            }
-
-            self.look_at = Matrix4::look_at(
-                self.camera_position,
-                self.camera_position + self.camera_front,
-                Vector3::unit_y(),
-            );
-        }
+        self.camera.home();
     }
 
     /// If a preview program has be assigned, render a miniature
@@ -192,18 +173,49 @@ impl Preview {
     /// network.
     pub fn draw(&self, renderer: &Renderer) {
         if let Some(ref program) = self.program_valid {
-            // Bind the SSBO of transform data.
             self.bind_transforms();
-
-            // Set the look-at matrix that will be used to construct
-            // the virtual camera.
-            program.uniform_matrix_4f("u_look_at_matrix", &self.look_at);
-            program.uniform_3f("u_camera_position", &self.camera_position.to_vec());
-            program.uniform_3f("u_camera_front", &self.camera_front);
+            program.uniform_3f("u_camera_position", &self.camera.position.to_vec());
+            program.uniform_3f("u_camera_front", &self.camera.front);
             program.uniform_1ui("u_shading", self.shading as u32);
             renderer.draw_rect_with_program(&self.aabb, program);
         } else {
             renderer.draw_rect_with_program(&self.aabb, &self.program_error);
+        }
+    }
+
+    pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
+        if self.aabb.inside(&mouse.curr) {
+            let offset = -mouse.velocity();
+            const ROTATION_SENSITIVITY: f32 = 0.25;
+            const TRANSLATION_SENSITIVITY: f32 = 0.01;
+
+            // Handle camera rotation.
+            if mouse.ldown {
+                self.camera.yaw += offset.x * ROTATION_SENSITIVITY;
+                self.camera.pitch += offset.y * ROTATION_SENSITIVITY;
+                self.camera.pitch.min(89.0).max(-89.0);
+                self.camera.rebuild_front();
+            }
+
+            // Handle camera translation.
+            if mouse.rdown {
+                self.camera.position += self.camera.right * offset.x * TRANSLATION_SENSITIVITY;
+                self.camera.position += self.camera.front * offset.y * TRANSLATION_SENSITIVITY;
+            }
+        }
+    }
+
+    fn bind_transforms(&self) {
+        unsafe {
+            gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, 0, self.ssbo);
+        }
+    }
+}
+
+impl Drop for Preview {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteBuffers(1, &self.ssbo);
         }
     }
 }

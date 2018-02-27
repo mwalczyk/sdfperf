@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use color::Color;
 use graph::{Connected, Graph};
-use interaction::{InteractionState, MouseInfo};
+use interaction::{InteractionState, MouseInfo, Panel};
 use operator::{Op, OpType};
 use preview::Preview;
 use renderer::Renderer;
@@ -135,6 +135,8 @@ impl Network {
         self.preview.update_transforms(transforms);
     }
 
+    /// Scales the distance field represented by the currently
+    /// selected op (if one exists).
     pub fn scale_selected(&mut self, val: f32) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
@@ -142,6 +144,8 @@ impl Network {
         }
     }
 
+    /// Translates the distance field represented by the currently
+    /// selected op (if one exists).
     pub fn translate_selected(&mut self, val: &Vector3<f32>) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
