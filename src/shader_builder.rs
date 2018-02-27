@@ -20,7 +20,7 @@ impl ShaderBuilder {
     /// and returns the appropriate shader code.
     pub fn build_sources(&mut self, network: &Network, indices: Vec<usize>) -> Option<Program> {
         static HEADER: &str = "
-        #version 450
+        #version 430
 
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
@@ -354,7 +354,7 @@ impl ShaderBuilder {
         println!("{}", self.shader_code);
 
         let vs_src = "
-        #version 450
+        #version 430
 
         layout(location = 0) in vec2 position;
         layout(location = 1) in vec2 texcoord;

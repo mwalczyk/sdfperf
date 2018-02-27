@@ -13,10 +13,16 @@ use std::os::raw::c_void;
 use std::ffi::CString;
 use std::time::{Duration, SystemTime};
 
-pub enum Alpha {
-    One,
+#[derive(Copy, Clone)]
+pub enum LineMode {
+    Solid,
     Dashed,
-    Constant(f32),
+}
+
+#[derive(Clone)]
+pub enum DrawParams<'a> {
+    Rectangle(&'a BoundingRect),
+    Line(&'a Vec<f32>, LineMode),
 }
 
 pub struct Renderer {
@@ -71,7 +77,7 @@ impl Renderer {
         ];
 
         static DRAW_VS_SRC: &'static str = "
-        #version 450
+        #version 430
 
         layout(location = 0) in vec2 position;
         layout(location = 1) in vec2 texcoord;
@@ -87,30 +93,44 @@ impl Renderer {
         }";
 
         static DRAW_FS_SRC: &'static str = "
-        #version 450
+        #version 430
 
         uniform float u_time;
         uniform vec4 u_draw_color = vec4(1.0);
         uniform uint u_draw_mode = 0;
 
         layout(binding = 0) uniform sampler2D u_color_map;
-        uniform bool u_use_maps;
+        layout(binding = 1) uniform sampler2D u_alpha_map;
+        uniform bool u_use_color_map;
+        uniform bool u_use_alpha_map;
 
         layout (location = 0) in vec2 vs_texcoord;
         layout (location = 0) out vec4 o_color;
 
         const uint DRAW_MODE_RECTANGLES = 0;
-        const uint DRAW_MODE_LINES = 1;
+        const uint DRAW_MODE_LINES_SOLID = 1;
+        const uint DRAW_MODE_LINES_DASHED = 2;
         void main() {
             vec2 uv = vs_texcoord;
 
-            const float stripes = 20.0;
-            float alpha = u_draw_mode == DRAW_MODE_RECTANGLES ? u_draw_color.a : max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
+            float alpha = u_draw_color.a;;
+            if (u_draw_mode == DRAW_MODE_LINES_DASHED)
+            {
+                const float stripes = 20.0;
+                alpha = max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
+            }
 
-            if (u_use_maps)
+            // the alpha map overrides the default alpha
+            if (u_use_alpha_map)
+            {
+                alpha = texture(u_alpha_map, uv).r;
+            }
+
+            if (u_use_color_map)
             {
                 uv.t = 1.0 - uv.t;
                 vec4 color = texture(u_color_map, uv);
+                color.a *= alpha;
                 o_color = color;
             }
             else
@@ -248,43 +268,62 @@ impl Renderer {
             .uniform_matrix_4f("u_projection_matrix", &self.projection);
     }
 
-    pub fn conditionally_bind(&mut self, id: GLuint) {
-        let mut needs_update = true;
-
-        if let Some(bound) = self.bound_programs.last() {
-            if *bound == id {
-                needs_update = false;
-            }
-        }
-
-        if needs_update {
-            self.program_draw.bind();
-            self.bound_programs.push(id);
-        }
-    }
-
-    /// Draws the rectangle described by `rect`, with solid `color`.
-    pub fn draw_rect(&mut self, rect: &BoundingRect, color: &Color, tex: Option<&Texture>) {
+    pub fn draw(
+        &mut self,
+        params: DrawParams,
+        color: &Color,
+        color_map: Option<&Texture>,
+        alpha_map: Option<&Texture>,
+    ) {
         self.program_draw.bind();
 
-        // First, set all relevant uniforms.
+        let mut model = Matrix4::identity();
+        if let DrawParams::Rectangle(bounds) = params {
+            model = *bounds.get_model_matrix();
+        }
+
+        // Set shared uniforms.
         self.program_draw
-            .uniform_matrix_4f("u_model_matrix", &rect.get_model_matrix());
+            .uniform_matrix_4f("u_model_matrix", &model);
         self.program_draw
             .uniform_4f("u_draw_color", &(*color).into());
-        self.program_draw.uniform_1ui("u_draw_mode", 0);
         self.program_draw
             .uniform_1f("u_time", self.get_elapsed_seconds());
 
         // Bind the color map, if available.
-        if let Some(tex) = tex {
-            self.program_draw.uniform_1i("u_use_maps", true as i32);
-            tex.bind(0);
+        if let Some(color_map) = color_map {
+            self.program_draw.uniform_1i("u_use_color_map", true as i32);
+            color_map.bind(0);
         } else {
-            self.program_draw.uniform_1i("u_use_maps", false as i32);
+            self.program_draw
+                .uniform_1i("u_use_color_map", false as i32);
         }
 
-        // Next, issue a draw call.
+        // Bind the alpha map, if available.
+        if let Some(alpha_map) = alpha_map {
+            self.program_draw.uniform_1i("u_use_alpha_map", true as i32);
+            alpha_map.bind(1);
+        } else {
+            self.program_draw
+                .uniform_1i("u_use_alpha_map", false as i32);
+        }
+
+        match params {
+            DrawParams::Rectangle(_) => {
+                self.program_draw.uniform_1ui("u_draw_mode", 0);
+                self.draw_rect_inner();
+            }
+            DrawParams::Line(data, mode) => {
+                self.program_draw
+                    .uniform_1ui("u_draw_mode", mode as u32 + 1);
+                self.draw_line_inner(&data);
+            }
+        }
+
+        self.program_draw.unbind();
+    }
+
+    fn draw_rect_inner(&self) {
         unsafe {
             gl::VertexArrayVertexBuffer(
                 self.vao,
@@ -297,13 +336,24 @@ impl Renderer {
             gl::BindVertexArray(self.vao);
             gl::DrawArrays(gl::TRIANGLES, 0, 6);
         }
+    }
 
-        // Unbind the color map, if it was used.
-        if let Some(tex) = tex {
-            tex.unbind(0);
+    fn draw_line_inner(&self, data: &Vec<f32>) {
+        unsafe {
+            let data_size = (data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
+            gl::NamedBufferSubData(self.vbo_line, 0, data_size, data.as_ptr() as *const c_void);
+
+            gl::VertexArrayVertexBuffer(
+                self.vao,
+                0,
+                self.vbo_line,
+                0,
+                (4 * mem::size_of::<GLfloat>()) as i32,
+            );
+
+            gl::BindVertexArray(self.vao);
+            gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);
         }
-
-        self.program_draw.unbind();
     }
 
     /// Draws the rectangle described by `rect`, with solid `color`.
@@ -330,41 +380,6 @@ impl Renderer {
         }
 
         program.unbind();
-    }
-
-    /// Draws a series of line segments.
-    pub fn draw_lines(&self, data: &Vec<f32>, color: &Color, dashed: bool) {
-        self.program_draw.bind();
-
-        // First, set all relevant uniforms.
-        let model = Matrix4::identity();
-        self.program_draw
-            .uniform_matrix_4f("u_model_matrix", &model);
-        self.program_draw
-            .uniform_4f("u_draw_color", &(*color).into());
-        self.program_draw.uniform_1ui("u_draw_mode", dashed as u32);
-        self.program_draw
-            .uniform_1f("u_time", self.get_elapsed_seconds());
-        self.program_draw.uniform_1i("u_use_maps", false as i32);
-
-        // Next, update buffer storage and issue a draw call.
-        unsafe {
-            let data_size = (data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
-            gl::NamedBufferSubData(self.vbo_line, 0, data_size, data.as_ptr() as *const c_void);
-
-            gl::VertexArrayVertexBuffer(
-                self.vao,
-                0,
-                self.vbo_line,
-                0,
-                (4 * mem::size_of::<GLfloat>()) as i32,
-            );
-
-            gl::BindVertexArray(self.vao);
-            gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);
-        }
-
-        self.program_draw.unbind();
     }
 
     fn get_elapsed_seconds(&self) -> f32 {

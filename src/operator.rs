@@ -9,6 +9,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+pub enum Connectivity {
+    InputOutput,
+    Input,
+    Output,
+}
+
 #[derive(PartialEq, Eq)]
 pub enum OpType {
     /// Generates a sphere primitive
@@ -53,6 +59,16 @@ impl OpType {
             OpType::Intersection => "intersection",
             OpType::SmoothMinimum => "smooth_minimum",
             OpType::Render => "render",
+        }
+    }
+
+    pub fn get_connectivity(&self) -> Connectivity {
+        match *self {
+            OpType::Sphere | OpType::Box | OpType::Plane => Connectivity::Output,
+            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
+                Connectivity::InputOutput
+            }
+            OpType::Render => Connectivity::Input,
         }
     }
 
@@ -115,7 +131,7 @@ impl OpType {
 
 pub enum Slot {
     Input(BoundingRect),
-    Output(BoundingRect)
+    Output(BoundingRect),
 }
 
 pub struct Op {
@@ -181,7 +197,8 @@ impl Op {
             SLOT_SIZE,
         );
 
-        let aabb_icon = BoundingRect::new(position, Vector2::new(40.0, 40.0));
+        let aabb_icon =
+            BoundingRect::new(position + Vector2::new(4.0, 4.0), Vector2::new(40.0, 40.0));
 
         let name = format!("{}_{}", family.to_string(), count);
 

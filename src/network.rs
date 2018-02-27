@@ -4,9 +4,9 @@ use uuid::Uuid;
 use color::Color;
 use graph::{Connected, Graph};
 use interaction::{InteractionState, MouseInfo, Panel};
-use operator::{Op, OpType};
+use operator::{Connectivity, Op, OpType};
 use preview::Preview;
-use renderer::Renderer;
+use renderer::{DrawParams, LineMode, Renderer};
 use texture::Texture;
 
 use std::cmp::max;
@@ -56,7 +56,7 @@ pub struct Network {
     /// to a grid when dragged
     snapping: bool,
 
-    icons: HashMap<String, Texture>,
+    assets: HashMap<String, Texture>,
 }
 
 enum Pair<T> {
@@ -91,7 +91,7 @@ impl Network {
             dirty: false,
             show_preview: true,
             snapping: true,
-            icons: HashMap::new(),
+            assets: HashMap::new(),
         };
 
         // Load all assets.
@@ -102,7 +102,7 @@ impl Network {
 
             if ext == Some(OsStr::new("png")) {
                 network
-                    .icons
+                    .assets
                     .insert(file.to_str().unwrap().to_string(), Texture::new(&path));
             }
         }
@@ -212,24 +212,50 @@ impl Network {
         match op.state {
             InteractionState::Selected => {
                 let aabb_select = op.aabb_op.expand_from_center(&Vector2::new(6.0, 6.0));
-                renderer.draw_rect(&aabb_select, &Color::from_hex(0x76B264, 1.0), None);
+                renderer.draw(
+                    DrawParams::Rectangle(&aabb_select),
+                    &Color::from_hex(0x76B264, 1.0),
+                    None,
+                    None,
+                );
             }
-            InteractionState::ConnectSource => {
-                renderer.draw_rect(&op.aabb_slot_output, &slot_color, None)
-            }
-            InteractionState::ConnectDestination => {
-                renderer.draw_rect(&op.aabb_slot_input, &slot_color, None)
-            }
+            InteractionState::ConnectSource => renderer.draw(
+                DrawParams::Rectangle(&op.aabb_slot_output),
+                &slot_color,
+                None,
+                None,
+            ),
+            InteractionState::ConnectDestination => renderer.draw(
+                DrawParams::Rectangle(&op.aabb_slot_input),
+                &slot_color,
+                None,
+                None,
+            ),
             _ => (),
         }
 
         // Draw the body of the op.
-        renderer.draw_rect(&op.aabb_op, &self.color_for_op(op), None);
+        let alpha_key = match op.family.get_connectivity() {
+            Connectivity::InputOutput => "alpha_input_output".to_string(),
+            Connectivity::Input => "alpha_input".to_string(),
+            Connectivity::Output => "alpha_output".to_string(),
+        };
+        let alpha_map = self.assets.get(&alpha_key).unwrap();
+        renderer.draw(
+            DrawParams::Rectangle(&op.aabb_op),
+            &self.color_for_op(op),
+            None,
+            Some(alpha_map),
+        );
 
         // Draw the icon (if one exists).
-        if let Some(tex) = self.icons.get(op.family.to_string()) {
-            renderer.draw_rect(&op.aabb_icon, &self.color_for_op(op), Some(tex));
-        }
+        let color_map = self.assets.get(op.family.to_string()).unwrap();
+        renderer.draw(
+            DrawParams::Rectangle(&op.aabb_icon),
+            &self.color_for_op(op),
+            Some(color_map),
+            None,
+        );
     }
 
     /// Draws all ops in the network.
@@ -268,9 +294,12 @@ impl Network {
             }
         }
 
-        let draw_color = Color::white();
-
-        renderer.draw_lines(&points, &draw_color, true);
+        renderer.draw(
+            DrawParams::Line(&points, LineMode::Dashed),
+            &Color::white(),
+            None,
+            None,
+        );
     }
 
     /// Draws a grid in the network editor.
@@ -315,8 +344,18 @@ impl Network {
         }
 
         let mut draw_color = Color::from_hex(0x373737, 0.25);
-        renderer.draw_lines(&points_v, &draw_color, false);
-        renderer.draw_lines(&points_h, &draw_color, false);
+        renderer.draw(
+            DrawParams::Line(&points_v, LineMode::Solid),
+            &draw_color,
+            None,
+            None,
+        );
+        renderer.draw(
+            DrawParams::Line(&points_h, LineMode::Solid),
+            &draw_color,
+            None,
+            None,
+        );
     }
 
     /// Draws all of the operators and edges that make
