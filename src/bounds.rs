@@ -31,7 +31,7 @@ impl Rect {
     }
 
     pub fn square(upper_left: Vector2<f32>, size: f32) -> Rect {
-        Rect::new(Vector2::new(size, size), upper_left)
+        Rect::new(upper_left, Vector2::new(size, size))
     }
 
     /// Returns the upper-left corner of the rectangle.

@@ -1,7 +1,6 @@
 use network::Network;
 use operator::{Op, OpType};
 use program::Program;
-use shader_string::ShaderString;
 
 use uuid::Uuid;
 
@@ -277,16 +276,7 @@ impl ShaderBuilder {
         for index in indices {
             if let Some(node) = network.graph.get_node(index) {
                 let mut formatted = match node.data.family {
-                    OpType::Sphere | OpType::Box | OpType::Plane => {
-                        let shader_code = ShaderString::new(
-                            node.data.family.get_code_template(),
-                            &node.data.name,
-                            Some(node.data.transform.index),
-                            None,
-                            None,
-                        );
-                        shader_code.to_string()
-                    }
+                    OpType::Sphere | OpType::Box | OpType::Plane => node.data.get_code(None, None),
 
                     OpType::Union
                     | OpType::Subtraction
@@ -301,14 +291,10 @@ impl ShaderBuilder {
 
                         let a = network.graph.edges[index].inputs[0];
                         let b = network.graph.edges[index].inputs[1];
-                        let shader_code = ShaderString::new(
-                            node.data.family.get_code_template(),
-                            &node.data.name,
-                            Some(node.data.transform.index),
+                        node.data.get_code(
                             Some(&network.graph.get_node(a).unwrap().data.name),
                             Some(&network.graph.get_node(b).unwrap().data.name),
-                        );
-                        shader_code.to_string()
+                        )
                     }
 
                     OpType::Render => {
@@ -320,21 +306,14 @@ impl ShaderBuilder {
                         }
 
                         let a = network.graph.edges[index].inputs[0];
-                        let mut shader_code = ShaderString::new(
-                            node.data.family.get_code_template(),
-                            &node.data.name,
-                            Some(node.data.transform.index),
-                            Some(&network.graph.get_node(a).unwrap().data.name),
-                            None,
-                        );
+                        let mut code = node.data
+                            .get_code(Some(&network.graph.get_node(a).unwrap().data.name), None);
 
                         // Add the final `return` in the `map(..)` function.
-                        shader_code.code.push('\n');
-                        shader_code.code.push('\t');
-                        shader_code
-                            .code
-                            .push_str(&format!("return vec2(0.0, {});", &node.data.name));
-                        shader_code.to_string()
+                        code.push('\n');
+                        code.push('\t');
+                        code.push_str(&format!("return vec2(0.0, {});", &node.data.name));
+                        code
                     }
                 };
 

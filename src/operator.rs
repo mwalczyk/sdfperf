@@ -234,6 +234,20 @@ impl Op {
         self.bounds_output.translate(offset);
         self.bounds_icon.translate(offset);
     }
+
+    pub fn get_code(&self, input_a: Option<&str>, input_b: Option<&str>) -> String {
+        let mut code = self.family.get_code_template();
+        code = code.replace("NAME", &self.name);
+        code = code.replace("INDEX", &self.transform.index.to_string());
+
+        if let Some(a) = input_a {
+            code = code.replace("INPUT_A", a);
+        }
+        if let Some(b) = input_b {
+            code = code.replace("INPUT_B", b);
+        }
+        code
+    }
 }
 
 impl Connected for Op {

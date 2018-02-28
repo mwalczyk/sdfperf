@@ -19,7 +19,6 @@ mod preview;
 mod program;
 mod renderer;
 mod shader_builder;
-mod shader_string;
 mod texture;
 
 use color::Color;
