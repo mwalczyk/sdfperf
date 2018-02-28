@@ -1,8 +1,8 @@
-use bounding_rect::BoundingRect;
+use bounds::{Edge, Rect};
 use graph::Connected;
 use interaction::InteractionState;
 
-use cgmath::{Vector2, Vector3, Vector4};
+use cgmath::{Vector2, Vector3, Vector4, Zero};
 use uuid::Uuid;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -130,8 +130,33 @@ impl OpType {
 }
 
 pub enum Slot {
-    Input(BoundingRect),
-    Output(BoundingRect),
+    Input(Rect),
+    Output(Rect),
+}
+
+/// A struct representing a transformation that will be
+/// applied to a distance field. Here, the xyz coordinates
+/// of `data` represent a translation and the w-coordinate
+/// represents a uniform scale.
+pub struct Transform {
+    pub data: Vector4<f32>,
+    pub index: usize,
+}
+
+impl Transform {
+    pub fn new(data: Vector4<f32>, index: usize) -> Transform {
+        Transform { data, index }
+    }
+
+    pub fn translate(&mut self, val: &Vector3<f32>) {
+        self.data.x += val.x;
+        self.data.y += val.y;
+        self.data.z += val.z;
+    }
+
+    pub fn scale(&mut self, val: f32) {
+        self.data.w += val;
+    }
 }
 
 pub struct Op {
@@ -139,16 +164,16 @@ pub struct Op {
     pub active_inputs: usize,
 
     /// The bounding box of the op
-    pub aabb_op: BoundingRect,
+    pub bounds_body: Rect,
 
     /// The bounding box of the op's input slot
-    pub aabb_slot_input: BoundingRect,
+    pub bounds_input: Rect,
 
     /// The bounding box of the op's output slot
-    pub aabb_slot_output: BoundingRect,
+    pub bounds_output: Rect,
 
     /// The bounding box of the op's icon
-    pub aabb_icon: BoundingRect,
+    pub bounds_icon: Rect,
 
     /// The current interaction state of the op
     pub state: InteractionState,
@@ -164,56 +189,39 @@ pub struct Op {
 
     /// The transform (translation and scale) that will be applied to the
     /// distance field represented by this op
-    pub transform: Vector4<f32>,
-
-    /// The index that will be used to grab this op's transform from the
-    /// GPU-side buffer
-    pub transform_index: usize,
+    pub transform: Transform,
 }
 
 impl Op {
     pub fn new(family: OpType, position: Vector2<f32>, size: Vector2<f32>) -> Op {
-        const SLOT_SIZE: Vector2<f32> = Vector2 { x: 12.0, y: 12.0 };
+        // Increment counter.
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
-        // The bounding region of the op itself
-        let aabb_op = BoundingRect::new(position, size);
+        // Set up bounding boxes.
+        let bounds_body = Rect::new(position, size);
 
-        // The small bounding region of the input connection slot for this operator
-        let aabb_slot_input = BoundingRect::new(
-            Vector2::new(
-                position.x - SLOT_SIZE.x * 0.5,
-                position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5,
-            ),
-            SLOT_SIZE,
-        );
+        let mut bounds_input = Rect::square(Vector2::zero(), 12.0);
+        bounds_input.center_on_edge(&bounds_body, Edge::Left);
 
-        // The small bounding region of the output connection slot for this operator
-        let aabb_slot_output = BoundingRect::new(
-            Vector2::new(
-                position.x + size.x - SLOT_SIZE.x * 0.5,
-                position.y + size.y * 0.5 - SLOT_SIZE.y * 0.5,
-            ),
-            SLOT_SIZE,
-        );
+        let mut bounds_output = Rect::square(Vector2::zero(), 12.0);
+        bounds_output.center_on_edge(&bounds_body, Edge::Right);
 
-        let aabb_icon =
-            BoundingRect::new(position + Vector2::new(4.0, 4.0), Vector2::new(40.0, 40.0));
+        let mut bounds_icon = Rect::new(position, Vector2::new(40.0, 40.0));
+        bounds_icon.translate(&Vector2::new(4.0, 4.0));
 
         let name = format!("{}_{}", family.to_string(), count);
 
         Op {
             active_inputs: 0,
-            aabb_op,
-            aabb_slot_input,
-            aabb_slot_output,
-            aabb_icon,
+            bounds_body,
+            bounds_input,
+            bounds_output,
+            bounds_icon,
             state: InteractionState::Deselected,
             uuid: Uuid::new_v4(),
             name,
             family,
-            transform: Vector4::new(0.0, 0.0, 0.0, 1.0),
-            transform_index: count,
+            transform: Transform::new(Vector4::new(0.0, 0.0, 0.0, 1.0), count),
         }
     }
 
@@ -221,14 +229,10 @@ impl Op {
     /// `offset`. Internally, this translates each of the
     /// bounding rectangles that are owned by this op.
     pub fn translate(&mut self, offset: &Vector2<f32>) {
-        self.aabb_op.translate(offset);
-        self.aabb_slot_input.translate(offset);
-        self.aabb_slot_output.translate(offset);
-        self.aabb_icon.translate(offset);
-    }
-
-    pub fn set_transform(&mut self, transform: &Vector4<f32>) {
-        self.transform = *transform;
+        self.bounds_body.translate(offset);
+        self.bounds_input.translate(offset);
+        self.bounds_output.translate(offset);
+        self.bounds_icon.translate(offset);
     }
 }
 

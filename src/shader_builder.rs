@@ -281,7 +281,7 @@ impl ShaderBuilder {
                         let shader_code = ShaderString::new(
                             node.data.family.get_code_template(),
                             &node.data.name,
-                            Some(node.data.transform_index),
+                            Some(node.data.transform.index),
                             None,
                             None,
                         );
@@ -304,7 +304,7 @@ impl ShaderBuilder {
                         let shader_code = ShaderString::new(
                             node.data.family.get_code_template(),
                             &node.data.name,
-                            Some(node.data.transform_index),
+                            Some(node.data.transform.index),
                             Some(&network.graph.get_node(a).unwrap().data.name),
                             Some(&network.graph.get_node(b).unwrap().data.name),
                         );
@@ -323,7 +323,7 @@ impl ShaderBuilder {
                         let mut shader_code = ShaderString::new(
                             node.data.family.get_code_template(),
                             &node.data.name,
-                            Some(node.data.transform_index),
+                            Some(node.data.transform.index),
                             Some(&network.graph.get_node(a).unwrap().data.name),
                             None,
                         );

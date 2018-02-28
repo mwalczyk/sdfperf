@@ -1,6 +1,7 @@
 use cgmath::{self, Vector2, Vector3, Vector4, Zero};
 use uuid::Uuid;
 
+use bounds::Rect;
 use color::Color;
 use graph::{Connected, Graph};
 use interaction::{InteractionState, MouseInfo, Panel};
@@ -28,18 +29,82 @@ use std::ffi::OsStr;
 /// Other:       0xFEC56D (yellow)
 ///
 
+pub struct Grid {
+    size: Vector2<f32>,
+    spacing: Vector2<usize>,
+    pub points_vertical: Vec<f32>,
+    pub points_horizontal: Vec<f32>
+}
+
+impl Grid {
+    pub fn new(size: Vector2<f32>, spacing: Vector2<usize>) -> Grid {
+        let mut points_vertical = Vec::new();
+        let mut points_horizontal = Vec::new();
+
+        let lines_x = size.x as usize / spacing.x;
+        let lines_y = size.y as usize / spacing.y;
+        let spacing_x = size.x / lines_x as f32;
+        let spacing_y = size.y / lines_y as f32;
+
+        let offset = size * 0.5;
+
+        // Draw vertical lines.
+        for i in 0..lines_x {
+            // Push back the first point.
+            points_vertical.push(i as f32 * spacing_x - offset.x);
+            points_vertical.push(-offset.y);
+            points_vertical.push(0.0);
+            points_vertical.push(0.0);
+
+            // Push back the second point.
+            points_vertical.push(i as f32 * spacing_x - offset.x);
+            points_vertical.push(offset.y);
+            points_vertical.push(1.0);
+            points_vertical.push(1.0);
+        }
+
+        // Draw vertical lines.
+        for i in 0..lines_y {
+            // Push back the first point.
+            points_horizontal.push(-offset.x);
+            points_horizontal.push(i as f32 * spacing_y - offset.y);
+            points_horizontal.push(0.0);
+            points_horizontal.push(0.0);
+
+            // Push back the second point.
+            points_horizontal.push(offset.x);
+            points_horizontal.push(i as f32 * spacing_y - offset.y);
+            points_horizontal.push(1.0);
+            points_horizontal.push(1.0);
+        }
+
+        Grid {
+            size,
+            spacing,
+            points_vertical,
+            points_horizontal
+        }
+    }
+}
+
 type Connection = usize;
 
 pub struct Network {
     /// An adjacency list representation of ops
     pub graph: Graph<Op, Connection>,
 
+    /// The sprite renderer that will be used to draw all nodes and
+    /// edges of the graph
+    renderer: Renderer,
+
     /// The preview of the shader that is represented by the
     /// current network
     pub preview: Preview,
 
+    pub grid: Grid,
+
     /// The index of the currently selected op (if there is one)
-    pub selection: Option<usize>,
+    selection: Option<usize>,
 
     /// The index of the root op (if there is one)
     pub root: Option<usize>,
@@ -56,6 +121,8 @@ pub struct Network {
     /// to a grid when dragged
     snapping: bool,
 
+    /// A map of asset names to textures, used to render various
+    /// UI elements
     assets: HashMap<String, Texture>,
 }
 
@@ -82,10 +149,12 @@ fn index_twice<T>(slc: &mut [T], a: usize, b: usize) -> Pair<&mut T> {
 
 impl Network {
     /// Constructs a new, empty network.
-    pub fn new() -> Network {
+    pub fn new(size: Vector2<f32>) -> Network {
         let mut network = Network {
             graph: Graph::new(),
+            renderer: Renderer::new(size),
             preview: Preview::new(),
+            grid: Grid::new(size, Vector2::new(20, 20)),
             selection: None,
             root: None,
             dirty: false,
@@ -93,20 +162,7 @@ impl Network {
             snapping: true,
             assets: HashMap::new(),
         };
-
-        // Load all assets.
-        for entry in fs::read_dir("assets").unwrap() {
-            let path = entry.unwrap().path();
-            let file = path.file_stem().unwrap();
-            let ext = path.extension();
-
-            if ext == Some(OsStr::new("png")) {
-                network
-                    .assets
-                    .insert(file.to_str().unwrap().to_string(), Texture::new(&path));
-            }
-        }
-
+        network.load_assets();
         network
     }
 
@@ -126,21 +182,12 @@ impl Network {
         self.show_preview = !self.show_preview;
     }
 
-    pub fn gather_transforms(&self) {
-        let mut transforms = Vec::new();
-        for node in self.graph.nodes.iter() {
-            transforms.push(node.data.transform);
-        }
-
-        self.preview.update_transforms(transforms);
-    }
-
     /// Scales the distance field represented by the currently
     /// selected op (if one exists).
     pub fn scale_selected(&mut self, val: f32) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
-            node.data.transform.w += val;
+            node.data.transform.scale(val);
         }
     }
 
@@ -149,9 +196,7 @@ impl Network {
     pub fn translate_selected(&mut self, val: &Vector3<f32>) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
-            node.data.transform.x += val.x;
-            node.data.transform.y += val.y;
-            node.data.transform.z += val.z;
+            node.data.transform.translate(val);
         }
     }
 
@@ -183,194 +228,6 @@ impl Network {
         self.graph.add_node(op, 0);
     }
 
-    /// Pick a draw color based on the current interaction state of this
-    /// operator and the op type.
-    fn color_for_op(&self, op: &Op) -> Color {
-        let mut color = match op.family {
-            OpType::Sphere | OpType::Box | OpType::Plane => Color::from_hex(0x8F719D, 1.0),
-            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
-                Color::from_hex(0xA8B6C5, 1.0)
-            }
-            OpType::Render => Color::from_hex(0xC77832, 1.0),
-        };
-
-        // Add a contribution based on the op's current interaction state.
-        if let InteractionState::Hover = op.state {
-            color += Color::mono(0.05, 0.0);
-        }
-        color
-    }
-
-    /// Draws a single op in the network.
-    fn draw_op(&self, op: &Op, renderer: &mut Renderer) {
-        // Draw the op and other components:
-        // - If the op is selected, draw a selection box behind it
-        // - If the op is being used as a connection source or
-        //   destination, draw the appropriate connection slot
-        let slot_color = Color::from_hex(0x373737, 1.0);
-
-        match op.state {
-            InteractionState::Selected => {
-                let aabb_select = op.aabb_op.expand_from_center(&Vector2::new(6.0, 6.0));
-                renderer.draw(
-                    DrawParams::Rectangle(&aabb_select),
-                    &Color::from_hex(0x76B264, 1.0),
-                    None,
-                    None,
-                );
-            }
-            InteractionState::ConnectSource => renderer.draw(
-                DrawParams::Rectangle(&op.aabb_slot_output),
-                &slot_color,
-                None,
-                None,
-            ),
-            InteractionState::ConnectDestination => renderer.draw(
-                DrawParams::Rectangle(&op.aabb_slot_input),
-                &slot_color,
-                None,
-                None,
-            ),
-            _ => (),
-        }
-
-        // Draw the body of the op.
-        let alpha_key = match op.family.get_connectivity() {
-            Connectivity::InputOutput => "alpha_input_output".to_string(),
-            Connectivity::Input => "alpha_input".to_string(),
-            Connectivity::Output => "alpha_output".to_string(),
-        };
-        let alpha_map = self.assets.get(&alpha_key).unwrap();
-        renderer.draw(
-            DrawParams::Rectangle(&op.aabb_op),
-            &self.color_for_op(op),
-            None,
-            Some(alpha_map),
-        );
-
-        // Draw the icon (if one exists).
-        let color_map = self.assets.get(op.family.to_string()).unwrap();
-        renderer.draw(
-            DrawParams::Rectangle(&op.aabb_icon),
-            &self.color_for_op(op),
-            Some(color_map),
-            None,
-        );
-    }
-
-    /// Draws all ops in the network.
-    fn draw_all_ops(&self, renderer: &mut Renderer) {
-        for node in self.graph.get_nodes().iter() {
-            self.draw_op(&node.data, renderer);
-        }
-    }
-
-    /// Draws all edges between ops in the network.
-    fn draw_all_edges(&self, renderer: &mut Renderer) {
-        let mut points = Vec::new();
-
-        for (src, edges) in self.graph.edges.iter().enumerate() {
-            for dst in edges.outputs.iter() {
-                let src_node = self.graph.get_node(src).unwrap();
-                let dst_node = self.graph.get_node(*dst).unwrap();
-
-                // How many inputs does the destination node
-                // currently have?
-                //let dst_inputs_count = self.graph.edges[*dst].inputs.len();
-                let src_centroid = src_node.data.aabb_slot_output.centroid();
-                let dst_centroid = dst_node.data.aabb_slot_input.centroid();
-
-                // Push back the first point.
-                points.push(src_centroid.x);
-                points.push(src_centroid.y);
-                points.push(0.0);
-                points.push(0.0);
-
-                // Push back the second point.
-                points.push(dst_centroid.x);
-                points.push(dst_centroid.y);
-                points.push(1.0);
-                points.push(1.0);
-            }
-        }
-
-        renderer.draw(
-            DrawParams::Line(&points, LineMode::Dashed),
-            &Color::white(),
-            None,
-            None,
-        );
-    }
-
-    /// Draws a grid in the network editor.
-    pub fn draw_grid(&self, renderer: &mut Renderer) {
-        let mut points_v = Vec::new();
-        let mut points_h = Vec::new();
-
-        let lines_x = renderer.get_resolution().x as u32 / 20;
-        let lines_y = renderer.get_resolution().y as u32 / 20;
-        let spacing_x = renderer.get_resolution().x / lines_x as f32;
-        let spacing_y = renderer.get_resolution().y / lines_y as f32;
-        let offset = renderer.get_resolution() * 0.5;
-
-        // Draw vertical lines.
-        for i in 0..lines_x {
-            // Push back the first point.
-            points_v.push(i as f32 * spacing_x - offset.x);
-            points_v.push(-offset.y);
-            points_v.push(0.0);
-            points_v.push(0.0);
-
-            // Push back the second point.
-            points_v.push(i as f32 * spacing_x - offset.x);
-            points_v.push(offset.y);
-            points_v.push(1.0);
-            points_v.push(1.0);
-        }
-
-        // Draw vertical lines.
-        for i in 0..lines_y {
-            // Push back the first point.
-            points_h.push(-offset.x);
-            points_h.push(i as f32 * spacing_y - offset.y);
-            points_h.push(0.0);
-            points_h.push(0.0);
-
-            // Push back the second point.
-            points_h.push(offset.x);
-            points_h.push(i as f32 * spacing_y - offset.y);
-            points_h.push(1.0);
-            points_h.push(1.0);
-        }
-
-        let mut draw_color = Color::from_hex(0x373737, 0.25);
-        renderer.draw(
-            DrawParams::Line(&points_v, LineMode::Solid),
-            &draw_color,
-            None,
-            None,
-        );
-        renderer.draw(
-            DrawParams::Line(&points_h, LineMode::Solid),
-            &draw_color,
-            None,
-            None,
-        );
-    }
-
-    /// Draws all of the operators and edges that make
-    /// up this graph.
-    pub fn draw(&self, renderer: &mut Renderer) {
-        self.draw_grid(renderer);
-        self.draw_all_edges(renderer);
-        self.draw_all_ops(renderer);
-
-        if self.show_preview {
-            self.gather_transforms();
-            self.preview.draw(renderer);
-        }
-    }
-
     /// Adds a new connection between two ops.
     pub fn add_connection(&mut self, a: usize, b: usize) {
         self.graph.add_edge(a, b);
@@ -398,6 +255,7 @@ impl Network {
         }
     }
 
+    /// Handles all mouse events.
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
         let mut connecting = false;
         let mut src: Option<usize> = None;
@@ -421,7 +279,7 @@ impl Network {
             }
 
             // Is the mouse inside of this op's bounding box?
-            if node.data.aabb_op.inside(&mouse.curr) {
+            if node.data.bounds_body.inside(&mouse.curr) {
                 // Is there an op currently selected?
                 if let Some(selected) = self.selection {
                     // Is this op the selected op?
@@ -443,7 +301,7 @@ impl Network {
                 if mouse.ldown {
                     // Are we inside the bounds of this op's output slot?
                     if node.data
-                        .aabb_slot_output
+                        .bounds_output
                         .inside_with_padding(&mouse.curr, 12.0)
                     {
                         // This op is now a potential connection source.
@@ -497,7 +355,7 @@ impl Network {
             for (index, node) in self.graph.nodes.iter_mut().enumerate() {
                 // Is the mouse now inside of a different op's input slot region?
                 if node.data
-                    .aabb_slot_input
+                    .bounds_input
                     .inside_with_padding(&mouse.curr, 12.0)
                 {
                     node.data.state = InteractionState::ConnectDestination;
@@ -513,5 +371,176 @@ impl Network {
         }
 
         self.preview.handle_interaction(&mouse);
+    }
+
+    /// Draws all of the operators and edges that make
+    /// up this graph.
+    pub fn draw(&mut self) {
+        self.draw_grid();
+        self.draw_all_edges();
+        self.draw_all_nodes();
+
+        if self.show_preview {
+            self.gather_transforms();
+
+            self.preview.prepare(self.renderer.get_projection());
+            self.renderer.draw_rect_inner();
+        }
+    }
+
+    /// Pick a draw color based on the current interaction state of this
+    /// operator and the op type.
+    fn color_for_op(&self, op: &Op) -> Color {
+        let mut color = match op.family {
+            OpType::Sphere | OpType::Box | OpType::Plane => Color::from_hex(0x8F719D, 1.0),
+            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
+                Color::from_hex(0xA8B6C5, 1.0)
+            }
+            OpType::Render => Color::from_hex(0xC77832, 1.0),
+        };
+
+        // Add a contribution based on the op's current interaction state.
+        if let InteractionState::Hover = op.state {
+            color += Color::mono(0.05, 0.0);
+        }
+        color
+    }
+
+    /// Draws all ops in the network.
+    fn draw_all_nodes(&mut self) {
+        for node in self.graph.get_nodes().iter() {
+            let op = &node.data;
+            //self.draw_op(&node.data);
+            // Draw the op and other components:
+            // - If the op is selected, draw a selection box behind it
+            // - If the op is being used as a connection source or
+            //   destination, draw the appropriate connection slot
+            let slot_color = Color::from_hex(0x373737, 1.0);
+            match op.state {
+                InteractionState::Selected => {
+                    let bounds_select = Rect::expanded_from(&op.bounds_body, &Vector2::new(6.0, 6.0));
+                    self.renderer.draw(
+                        DrawParams::Rectangle(&bounds_select),
+                        &Color::from_hex(0x76B264, 1.0),
+                        None,
+                        None,
+                    );
+                }
+                InteractionState::ConnectSource => self.renderer.draw(
+                    DrawParams::Rectangle(&op.bounds_output),
+                    &slot_color,
+                    None,
+                    None,
+                ),
+                InteractionState::ConnectDestination => self.renderer.draw(
+                    DrawParams::Rectangle(&op.bounds_input),
+                    &slot_color,
+                    None,
+                    None,
+                ),
+                _ => (),
+            }
+
+            // Draw the body of the op.
+            let draw_color = self.color_for_op(op);
+            let alpha_key = match op.family.get_connectivity() {
+                Connectivity::InputOutput => "alpha_input_output".to_string(),
+                Connectivity::Input => "alpha_input".to_string(),
+                Connectivity::Output => "alpha_output".to_string(),
+            };
+            let alpha_map = self.assets.get(&alpha_key).unwrap();
+            self.renderer.draw(
+                DrawParams::Rectangle(&op.bounds_body),
+                &draw_color,
+                None,
+                Some(alpha_map),
+            );
+
+            // Draw the icon on top of the op (if one exists).
+            let color_map = self.assets.get(op.family.to_string()).unwrap();
+            self.renderer.draw(
+                DrawParams::Rectangle(&op.bounds_icon),
+                &draw_color,
+                Some(color_map),
+                None,
+            );
+        }
+    }
+
+    /// Draws all edges between ops in the network.
+    fn draw_all_edges(&mut self) {
+        let mut points = Vec::new();
+
+        for (src, edges) in self.graph.edges.iter().enumerate() {
+            for dst in edges.outputs.iter() {
+                let src_node = self.graph.get_node(src).unwrap();
+                let dst_node = self.graph.get_node(*dst).unwrap();
+
+                // How many inputs does the destination node
+                // currently have?
+                //let dst_inputs_count = self.graph.edges[*dst].inputs.len();
+                let src_centroid = src_node.data.bounds_output.centroid();
+                let dst_centroid = dst_node.data.bounds_input.centroid();
+
+                // Push back the first point.
+                points.push(src_centroid.x);
+                points.push(src_centroid.y);
+                points.push(0.0);
+                points.push(0.0);
+
+                // Push back the second point.
+                points.push(dst_centroid.x);
+                points.push(dst_centroid.y);
+                points.push(1.0);
+                points.push(1.0);
+            }
+        }
+
+        self.renderer.draw(
+            DrawParams::Line(&points, LineMode::Dashed),
+            &Color::white(),
+            None,
+            None,
+        );
+    }
+
+    /// Draws a grid in the network editor.
+    fn draw_grid(&mut self) {
+        let draw_color = Color::from_hex(0x373737, 0.25);
+        self.renderer.draw(
+            DrawParams::Line(&self.grid.points_vertical, LineMode::Solid),
+            &draw_color,
+            None,
+            None,
+        );
+        self.renderer.draw(
+            DrawParams::Line(&self.grid.points_horizontal, LineMode::Solid),
+            &draw_color,
+            None,
+            None,
+        );
+    }
+
+    fn gather_transforms(&self) {
+        let mut transforms = Vec::new();
+        for node in self.graph.nodes.iter() {
+            transforms.push(node.data.transform.data);
+        }
+
+        self.preview.update_transforms(transforms);
+    }
+
+    /// Loads all texture assets.
+    fn load_assets(&mut self) {
+        for entry in fs::read_dir("assets").unwrap() {
+            let path = entry.unwrap().path();
+            let file = path.file_stem().unwrap();
+            let ext = path.extension();
+
+            if ext == Some(OsStr::new("png")) {
+                self.assets
+                    .insert(file.to_str().unwrap().to_string(), Texture::new(&path));
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 use cgmath::{Vector2, Zero};
 
-use bounding_rect::BoundingRect;
+use bounds::Rect;
 
 pub struct MouseInfo {
     /// The current position of the mouse
@@ -58,7 +58,7 @@ pub enum InteractionState {
 /// display window that the user can interact with.
 pub trait Panel {
     /// Returns the bounding rectangular defined by this panel.
-    fn get_bounds(&self) -> &BoundingRect;
+    fn get_bounds(&self) -> &Rect;
 
     /// Returns an immutable pointer to a list of all of this
     /// panel's children.

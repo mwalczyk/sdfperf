@@ -1,13 +1,11 @@
-use gl;
-use gl::types::*;
+use gl::{self, types::*};
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4,
              Zero};
 
-use bounding_rect::BoundingRect;
+use bounds::Rect;
 use color::Color;
 use interaction::{MouseInfo, Panel};
 use program::Program;
-use renderer::Renderer;
 
 use std::mem;
 use std::ptr;
@@ -75,7 +73,7 @@ pub struct Preview {
 
     program_error: Program,
 
-    aabb: BoundingRect,
+    bounds: Rect,
 
     camera: VirtualCamera,
 
@@ -133,7 +131,7 @@ impl Preview {
         Preview {
             program_valid: None,
             program_error,
-            aabb: BoundingRect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
+            bounds: Rect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
             camera: VirtualCamera::new(),
             shading: Shading::Normals,
             ssbo,
@@ -171,20 +169,26 @@ impl Preview {
     /// If a preview program has be assigned, render a miniature
     /// preview window in the lower right-hand corner of the
     /// network.
-    pub fn draw(&self, renderer: &Renderer) {
+    pub fn prepare(&self, projection: &Matrix4<f32>) {
         if let Some(ref program) = self.program_valid {
             self.bind_transforms();
+            program.bind();
             program.uniform_3f("u_camera_position", &self.camera.position.to_vec());
             program.uniform_3f("u_camera_front", &self.camera.front);
             program.uniform_1ui("u_shading", self.shading as u32);
-            renderer.draw_rect_with_program(&self.aabb, program);
+            program.uniform_matrix_4f("u_model_matrix", &self.bounds.get_model_matrix());
+            program.uniform_matrix_4f("u_projection_matrix", &projection);
         } else {
-            renderer.draw_rect_with_program(&self.aabb, &self.program_error);
+            self.program_error.bind();
+            self.program_error
+                .uniform_matrix_4f("u_model_matrix", &self.bounds.get_model_matrix());
+            self.program_error
+                .uniform_matrix_4f("u_projection_matrix", &projection);
         }
     }
 
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
-        if self.aabb.inside(&mouse.curr) {
+        if self.bounds.inside(&mouse.curr) {
             let offset = -mouse.velocity();
             const ROTATION_SENSITIVITY: f32 = 0.25;
             const TRANSLATION_SENSITIVITY: f32 = 0.01;

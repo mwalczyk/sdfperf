@@ -9,7 +9,7 @@ extern crate glutin;
 extern crate image;
 extern crate uuid;
 
-mod bounding_rect;
+mod bounds;
 mod color;
 mod graph;
 mod interaction;
@@ -46,21 +46,20 @@ fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
         .with_dimensions(800, 600)
-        .with_title("sdfperf");
+        .with_title("signed-distance fields");
     let context = glutin::ContextBuilder::new().with_multisampling(4);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
     unsafe { gl_window.make_current() }.unwrap();
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
 
-    // Main objects
-    let mut network = Network::new();
-    let mut renderer = Renderer::new();
-    let mut builder = ShaderBuilder::new();
-
     // Constants
     const ZOOM_INCREMENT: f32 = 0.05;
     const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
     let mut current_size = Vector2::new(800.0, 600.0);
+
+    // Main objects
+    let mut network = Network::new(current_size);
+    let mut builder = ShaderBuilder::new();
 
     // Store interaction state
     let mut mouse = MouseInfo::new();
@@ -75,8 +74,6 @@ fn main() {
                         current_size.x = w as f32;
                         current_size.y = h as f32;
                         gl_window.resize(w, h);
-
-                        renderer.resize(&current_size);
                     }
 
                     glutin::WindowEvent::MouseMoved { position, .. } => {
@@ -98,8 +95,6 @@ fn main() {
                             } else {
                                 mouse.scroll += ZOOM_INCREMENT;
                             }
-
-                            // TODO: renderer.zoom(mouse.scroll);
                             network.handle_interaction(&mouse);
                         }
                     }
@@ -171,7 +166,6 @@ fn main() {
                                         }
                                         glutin::VirtualKeyCode::Minus => {
                                             network.scale_selected(-0.05);
-                                            //translate_selected
                                         }
                                         glutin::VirtualKeyCode::Left => {
                                             network.translate_selected(&(Vector3::unit_x() * 0.05));
@@ -214,7 +208,7 @@ fn main() {
         }
 
         // Draw the graph (ops, connections, preview window, etc.).
-        network.draw(&mut renderer);
+        network.draw();
 
         gl_window.swap_buffers().unwrap();
     }

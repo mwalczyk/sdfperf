@@ -1,8 +1,7 @@
-use gl;
-use gl::types::*;
+use gl::{self, types::*};
 use cgmath::{self, Matrix, Matrix4, One, PerspectiveFov, SquareMatrix, Vector2, Vector4, Zero};
 
-use bounding_rect::BoundingRect;
+use bounds::Rect;
 use color::Color;
 use program::Program;
 use texture::Texture;
@@ -21,17 +20,11 @@ pub enum LineMode {
 
 #[derive(Clone)]
 pub enum DrawParams<'a> {
-    Rectangle(&'a BoundingRect),
+    Rectangle(&'a Rect),
     Line(&'a Vec<f32>, LineMode),
 }
 
 pub struct Renderer {
-    /// The OpenGL handle of the currently bound program (if there is one)
-    bound_programs: Vec<GLuint>,
-
-    /// The OpenGL handle of the currently bound VAO (if there is one)
-    bound_vao: Option<GLuint>,
-
     /// The shader program that will be used to draw sprites
     program_draw: Program,
 
@@ -51,10 +44,10 @@ pub struct Renderer {
     vbo_line: u32,
 
     /// The zoom of the network editor
-    network_zoom: f32,
+    zoom: f32,
 
     /// The resolution (in pixels) of the network editor
-    network_resolution: Vector2<f32>,
+    size: Vector2<f32>,
 
     /// An application timer
     time: SystemTime,
@@ -62,7 +55,7 @@ pub struct Renderer {
 
 impl Renderer {
     /// Constructs and returns a new renderer instance.
-    pub fn new() -> Renderer {
+    pub fn new(size: Vector2<f32>) -> Renderer {
         static VERTEX_DATA: [GLfloat; 24] = [
             // Positions followed by texture coordinates.
             // First triangle
@@ -216,38 +209,38 @@ impl Renderer {
         }
 
         let mut renderer = Renderer {
-            bound_programs: Vec::new(),
-            bound_vao: None,
             program_draw,
             projection: Matrix4::zero(),
             vao,
             vbo_rect,
             vbo_line,
-            network_zoom: 1.0,
-            network_resolution: Vector2::new(800.0, 600.0),
+            zoom: 1.0,
+            size,
             time: SystemTime::now(),
         };
-
         renderer.zoom(1.0);
-
         renderer
     }
 
-    pub fn get_resolution(&self) -> &Vector2<f32> {
-        &self.network_resolution
+    pub fn get_projection(&self) -> &Matrix4<f32> {
+        &self.projection
+    }
+
+    pub fn get_size(&self) -> &Vector2<f32> {
+        &self.size
     }
 
     /// Zooms the network in or out by modifying the underlying
     /// projection matrix. If `zoom` is `1.0`, this is
     /// effectively the "home" position.
     pub fn zoom(&mut self, zoom: f32) {
-        self.network_zoom = zoom;
+        self.zoom = zoom;
         self.rebuild_projection_matrix();
     }
 
     /// Resizes the network.
     pub fn resize(&mut self, resolution: &Vector2<f32>) {
-        self.network_resolution = *resolution;
+        self.size = *resolution;
         self.rebuild_projection_matrix();
     }
 
@@ -255,10 +248,10 @@ impl Renderer {
     /// L, R, B, T, N, F
     fn rebuild_projection_matrix(&mut self) {
         self.projection = cgmath::ortho(
-            -(self.network_resolution.x * 0.5) * self.network_zoom,
-            (self.network_resolution.x * 0.5) * self.network_zoom,
-            (self.network_resolution.y * 0.5) * self.network_zoom,
-            -(self.network_resolution.y * 0.5) * self.network_zoom,
+            -(self.size.x * 0.5) * self.zoom,
+            (self.size.x * 0.5) * self.zoom,
+            (self.size.y * 0.5) * self.zoom,
+            -(self.size.y * 0.5) * self.zoom,
             -1.0,
             1.0,
         );
@@ -308,6 +301,7 @@ impl Renderer {
                 .uniform_1i("u_use_alpha_map", false as i32);
         }
 
+        // Issue draw call.
         match params {
             DrawParams::Rectangle(_) => {
                 self.program_draw.uniform_1ui("u_draw_mode", 0);
@@ -323,7 +317,7 @@ impl Renderer {
         self.program_draw.unbind();
     }
 
-    fn draw_rect_inner(&self) {
+    pub fn draw_rect_inner(&self) {
         unsafe {
             gl::VertexArrayVertexBuffer(
                 self.vao,
@@ -338,7 +332,7 @@ impl Renderer {
         }
     }
 
-    fn draw_line_inner(&self, data: &Vec<f32>) {
+    pub fn draw_line_inner(&self, data: &Vec<f32>) {
         unsafe {
             let data_size = (data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::NamedBufferSubData(self.vbo_line, 0, data_size, data.as_ptr() as *const c_void);
@@ -354,32 +348,6 @@ impl Renderer {
             gl::BindVertexArray(self.vao);
             gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);
         }
-    }
-
-    /// Draws the rectangle described by `rect`, with solid `color`.
-    pub fn draw_rect_with_program(&self, rect: &BoundingRect, program: &Program) {
-        program.bind();
-
-        // First, set all relevant uniforms.
-        program.uniform_matrix_4f("u_model_matrix", &rect.get_model_matrix());
-        program.uniform_matrix_4f("u_projection_matrix", &self.projection);
-        program.uniform_1f("u_time", self.get_elapsed_seconds());
-
-        // Next, issue a draw call.
-        unsafe {
-            gl::VertexArrayVertexBuffer(
-                self.vao,
-                0,
-                self.vbo_rect,
-                0,
-                (4 * mem::size_of::<GLfloat>()) as i32,
-            );
-
-            gl::BindVertexArray(self.vao);
-            gl::DrawArrays(gl::TRIANGLES, 0, 6);
-        }
-
-        program.unbind();
     }
 
     fn get_elapsed_seconds(&self) -> f32 {
