@@ -61,7 +61,6 @@ impl Rect {
         self.rebuild_model_matrix();
     }
 
-
     pub fn snap_to_nearest(&mut self, increment: &Vector2<f32>) {
         // TODO
     }
@@ -143,4 +142,3 @@ impl Default for Rect {
         }
     }
 }
-

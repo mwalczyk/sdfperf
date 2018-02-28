@@ -33,7 +33,7 @@ pub struct Grid {
     size: Vector2<f32>,
     spacing: Vector2<usize>,
     pub points_vertical: Vec<f32>,
-    pub points_horizontal: Vec<f32>
+    pub points_horizontal: Vec<f32>,
 }
 
 impl Grid {
@@ -50,39 +50,37 @@ impl Grid {
 
         // Draw vertical lines.
         for i in 0..lines_x {
-            // Push back the first point.
-            points_vertical.push(i as f32 * spacing_x - offset.x);
-            points_vertical.push(-offset.y);
-            points_vertical.push(0.0);
-            points_vertical.push(0.0);
-
-            // Push back the second point.
-            points_vertical.push(i as f32 * spacing_x - offset.x);
-            points_vertical.push(offset.y);
-            points_vertical.push(1.0);
-            points_vertical.push(1.0);
+            points_vertical.extend_from_slice(&[
+                i as f32 * spacing_x - offset.x,
+                -offset.y,
+                0.0,
+                0.0,
+                i as f32 * spacing_x - offset.x,
+                offset.y,
+                1.0,
+                1.0,
+            ]);
         }
 
-        // Draw vertical lines.
+        // Draw horizontal lines.
         for i in 0..lines_y {
-            // Push back the first point.
-            points_horizontal.push(-offset.x);
-            points_horizontal.push(i as f32 * spacing_y - offset.y);
-            points_horizontal.push(0.0);
-            points_horizontal.push(0.0);
-
-            // Push back the second point.
-            points_horizontal.push(offset.x);
-            points_horizontal.push(i as f32 * spacing_y - offset.y);
-            points_horizontal.push(1.0);
-            points_horizontal.push(1.0);
+            points_horizontal.extend_from_slice(&[
+                -offset.x,
+                i as f32 * spacing_y - offset.y,
+                0.0,
+                0.0,
+                offset.x,
+                i as f32 * spacing_y - offset.y,
+                1.0,
+                1.0,
+            ]);
         }
 
         Grid {
             size,
             spacing,
             points_vertical,
-            points_horizontal
+            points_horizontal,
         }
     }
 }
@@ -95,16 +93,18 @@ pub struct Network {
 
     /// The sprite renderer that will be used to draw all nodes and
     /// edges of the graph
-    renderer: Renderer,
+    pub renderer: Renderer,
 
     /// The preview of the shader that is represented by the
     /// current network
     pub preview: Preview,
 
+    /// The wireframe grid that will be drawn in the background of
+    /// the network editor
     pub grid: Grid,
 
     /// The index of the currently selected op (if there is one)
-    selection: Option<usize>,
+    pub selection: Option<usize>,
 
     /// The index of the root op (if there is one)
     pub root: Option<usize>,
@@ -418,7 +418,8 @@ impl Network {
             let slot_color = Color::from_hex(0x373737, 1.0);
             match op.state {
                 InteractionState::Selected => {
-                    let bounds_select = Rect::expanded_from(&op.bounds_body, &Vector2::new(6.0, 6.0));
+                    let bounds_select =
+                        Rect::expanded_from(&op.bounds_body, &Vector2::new(6.0, 6.0));
                     self.renderer.draw(
                         DrawParams::Rectangle(&bounds_select),
                         &Color::from_hex(0x76B264, 1.0),
@@ -475,24 +476,14 @@ impl Network {
             for dst in edges.outputs.iter() {
                 let src_node = self.graph.get_node(src).unwrap();
                 let dst_node = self.graph.get_node(*dst).unwrap();
-
-                // How many inputs does the destination node
-                // currently have?
-                //let dst_inputs_count = self.graph.edges[*dst].inputs.len();
                 let src_centroid = src_node.data.bounds_output.centroid();
                 let dst_centroid = dst_node.data.bounds_input.centroid();
 
                 // Push back the first point.
-                points.push(src_centroid.x);
-                points.push(src_centroid.y);
-                points.push(0.0);
-                points.push(0.0);
+                points.extend_from_slice(&[src_centroid.x, src_centroid.y, 0.0, 0.0]);
 
                 // Push back the second point.
-                points.push(dst_centroid.x);
-                points.push(dst_centroid.y);
-                points.push(1.0);
-                points.push(1.0);
+                points.extend_from_slice(&[dst_centroid.x, dst_centroid.y, 1.0, 1.0]);
             }
         }
 
@@ -521,6 +512,7 @@ impl Network {
         );
     }
 
+    /// Aggregates all of the distance field transforms.
     fn gather_transforms(&self) {
         let mut transforms = Vec::new();
         for node in self.graph.nodes.iter() {
