@@ -15,6 +15,48 @@ pub enum Connectivity {
     Output,
 }
 
+pub enum ConnectionType {
+    /// A connection between two ops that are compatible and from
+    /// the same family
+    Direct,
+
+    /// A connection between two ops that are compatible but from
+    /// different families
+    Indirect,
+
+    /// An invalid connection
+    Incompatible
+}
+
+pub enum OpFamily {
+    Domain,
+        // Root (p)
+        // Transform (TRS)
+        // Twist
+        // Bend
+    Data,
+        // Time
+        // Math
+        // Sin
+        // Cos
+        // Noise
+    Primitive,
+        // Sphere
+        // Box
+        // Plane
+        // Torus
+        // Union
+        // Subtraction
+        // Intersection
+        // Smooth minimum
+        // *Render
+    Displacement,
+        // INPUT_A += noise(p_INPUT_A);
+        // Noise
+        // Sin
+        // Cos
+}
+
 #[derive(PartialEq, Eq)]
 pub enum OpType {
     /// Generates a sphere primitive
