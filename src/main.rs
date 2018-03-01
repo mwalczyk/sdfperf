@@ -24,7 +24,11 @@ mod texture;
 // TODO:
 // - Limit generators (i.e. sphere) to ONE output, since
 //   the current graph traversal code doesn't work if the
-//   same generator is connected to multiple other nodes
+//   same generator is connected to multiple other nodes.
+//   the other option would be to properly handle this
+//   during graph traversal so that the shader code for this
+//   generator is duplicated. This would mean that transforms
+//   should be their own family of operator as well.
 
 use color::Color;
 use interaction::{MouseInfo, Panel};

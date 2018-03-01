@@ -404,7 +404,9 @@ impl Network {
     /// operator and the op type.
     fn color_for_op(&self, op: &Op) -> Color {
         let mut color = match op.family {
-            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => Color::from_hex(0x8F719D, 1.0),
+            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => {
+                Color::from_hex(0x8F719D, 1.0)
+            }
             OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
                 Color::from_hex(0xA8B6C5, 1.0)
             }
