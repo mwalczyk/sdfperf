@@ -193,7 +193,7 @@ pub struct Op {
 }
 
 impl Op {
-    pub fn new(family: OpType, position: Vector2<f32>, size: Vector2<f32>) -> Op {
+    pub fn new(index: usize, family: OpType, position: Vector2<f32>, size: Vector2<f32>) -> Op {
         // Increment counter.
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
@@ -221,7 +221,7 @@ impl Op {
             uuid: Uuid::new_v4(),
             name,
             family,
-            transform: Transform::new(Vector4::new(0.0, 0.0, 0.0, 1.0), count),
+            transform: Transform::new(Vector4::new(0.0, 0.0, 0.0, 1.0), index),
         }
     }
 

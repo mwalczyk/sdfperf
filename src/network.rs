@@ -7,7 +7,7 @@ use graph::{Connected, Graph};
 use interaction::{InteractionState, MouseInfo, Panel};
 use operator::{Connectivity, Op, OpType};
 use preview::Preview;
-use renderer::{DrawParams, LineMode, Renderer};
+use renderer::{DrawParams, LineMode, LineConnectivity, Renderer};
 use texture::Texture;
 
 use std::cmp::max;
@@ -204,7 +204,7 @@ impl Network {
     pub fn delete_selected(&mut self) {
         if let Some(selected) = self.selection {
             // Before removing this vertex from the graph,
-            // check to see if it is connected to the root
+            // check to see if it was connected to the root
             // (if one exists). If so, then the shader
             // graph needs to be rebuilt.
             if let Some(root) = self.root {
@@ -216,6 +216,15 @@ impl Network {
                     }
                 }
             }
+
+            // The last node in the graph's list of nodes
+            // will be moved, so its transform index needs
+            // to be reset.
+            if let Some(node) = self.graph.nodes.last_mut() {
+                node.data.transform.index = selected;
+            }
+
+            // Finally, remove the node and reset the selection.
             self.graph.remove_node(selected);
             self.selection = None;
         }
@@ -224,7 +233,9 @@ impl Network {
     /// Adds a new op of type `family` to the network at coordinates
     /// `position` and dimensions `size`.
     pub fn add_op(&mut self, family: OpType, position: Vector2<f32>, size: Vector2<f32>) {
-        let op = Op::new(family, position, size);
+        let index = self.graph.nodes.len();
+        let op = Op::new(index, family, position, size);
+
         self.graph.add_node(op, 0);
     }
 
@@ -239,9 +250,10 @@ impl Network {
                 self.dirty = true;
                 println!("Active render node in-line: re-building graph");
             }
+
             // If we are connecting to a render op, then the shader
             // must be rebuilt.
-            if node_b.data.family == OpType::Render {
+            if let OpType::Render = node_b.data.family {
                 self.root = Some(b);
                 self.dirty = true;
                 println!("Connected to render node: building graph");
@@ -410,7 +422,7 @@ impl Network {
     fn draw_all_nodes(&mut self) {
         for node in self.graph.get_nodes().iter() {
             let op = &node.data;
-            //self.draw_op(&node.data);
+
             // Draw the op and other components:
             // - If the op is selected, draw a selection box behind it
             // - If the op is being used as a connection source or
@@ -468,9 +480,39 @@ impl Network {
         }
     }
 
+    fn draw_curve(&self, a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>, d: Vector2<f32>) {
+        const LOD: usize = 20;
+        let mut points = Vec::with_capacity(LOD * 4);
+
+        for i in 0..LOD {
+            let t = (i as f32) / (LOD as f32);
+            let t_inv = 1.0 - t;
+
+            // Coefficients for a cubic polynomial.
+            let b0 = t * t * t;
+            let b1 = 3.0 * t * t * t_inv;
+            let b2 = 3.0 * t * t_inv * t_inv;
+            let b3 = t_inv * t_inv * t_inv;
+
+            let point = a * b0 + b * b1 + c * b2 + d * b3;
+
+            points.extend_from_slice(&[point.x, point.y, t, t]);
+        }
+
+        // Add the first point.
+        points.extend_from_slice(&[a.x, a.y, 0.0, 0.0]);
+
+        self.renderer.draw(
+            DrawParams::Line(&points, LineMode::Solid, LineConnectivity::Strip),
+            &Color::mono(0.75, 1.0),
+            None,
+            None,
+        );
+    }
+
     /// Draws all edges between ops in the network.
-    fn draw_all_edges(&mut self) {
-        let mut points = Vec::new();
+    fn draw_all_edges(&self) {
+        // let mut points = Vec::new();
 
         for (src, edges) in self.graph.edges.iter().enumerate() {
             for dst in edges.outputs.iter() {
@@ -479,33 +521,28 @@ impl Network {
                 let src_centroid = src_node.data.bounds_output.centroid();
                 let dst_centroid = dst_node.data.bounds_input.centroid();
 
-                // Push back the first point.
-                points.extend_from_slice(&[src_centroid.x, src_centroid.y, 0.0, 0.0]);
+                let a = src_centroid;
+                let d = dst_centroid;
+                let mid = (a + d) * 0.5;
 
-                // Push back the second point.
-                points.extend_from_slice(&[dst_centroid.x, dst_centroid.y, 1.0, 1.0]);
+                let b = Vector2::new(mid.x, a.y);
+                let c = Vector2::new(mid.x, d.y);
+                self.draw_curve(a, b, c, d);
             }
         }
-
-        self.renderer.draw(
-            DrawParams::Line(&points, LineMode::Dashed),
-            &Color::white(),
-            None,
-            None,
-        );
     }
 
     /// Draws a grid in the network editor.
     fn draw_grid(&mut self) {
         let draw_color = Color::from_hex(0x373737, 0.25);
         self.renderer.draw(
-            DrawParams::Line(&self.grid.points_vertical, LineMode::Solid),
+            DrawParams::Line(&self.grid.points_vertical, LineMode::Solid, LineConnectivity::Segment),
             &draw_color,
             None,
             None,
         );
         self.renderer.draw(
-            DrawParams::Line(&self.grid.points_horizontal, LineMode::Solid),
+            DrawParams::Line(&self.grid.points_horizontal, LineMode::Solid, LineConnectivity::Segment),
             &draw_color,
             None,
             None,

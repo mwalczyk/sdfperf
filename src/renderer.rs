@@ -18,10 +18,16 @@ pub enum LineMode {
     Dashed,
 }
 
+#[derive(Copy, Clone)]
+pub enum LineConnectivity {
+    Segment,
+    Strip,
+}
+
 #[derive(Clone)]
 pub enum DrawParams<'a> {
     Rectangle(&'a Rect),
-    Line(&'a Vec<f32>, LineMode),
+    Line(&'a Vec<f32>, LineMode, LineConnectivity),
 }
 
 pub struct Renderer {
@@ -262,7 +268,7 @@ impl Renderer {
     }
 
     pub fn draw(
-        &mut self,
+        &self,
         params: DrawParams,
         color: &Color,
         color_map: Option<&Texture>,
@@ -307,10 +313,10 @@ impl Renderer {
                 self.program_draw.uniform_1ui("u_draw_mode", 0);
                 self.draw_rect_inner();
             }
-            DrawParams::Line(data, mode) => {
+            DrawParams::Line(data, mode, connectivity) => {
                 self.program_draw
                     .uniform_1ui("u_draw_mode", mode as u32 + 1);
-                self.draw_line_inner(&data);
+                self.draw_line_inner(&data, connectivity);
             }
         }
 
@@ -332,7 +338,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_line_inner(&self, data: &Vec<f32>) {
+    pub fn draw_line_inner(&self, data: &Vec<f32>, connectivity: LineConnectivity) {
         unsafe {
             let data_size = (data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::NamedBufferSubData(self.vbo_line, 0, data_size, data.as_ptr() as *const c_void);
@@ -345,8 +351,13 @@ impl Renderer {
                 (4 * mem::size_of::<GLfloat>()) as i32,
             );
 
+            let primitive = match connectivity {
+                LineConnectivity::Segment => gl::LINES,
+                LineConnectivity::Strip => gl::LINE_STRIP,
+            };
+
             gl::BindVertexArray(self.vao);
-            gl::DrawArrays(gl::LINES, 0, (data.len() / 4) as i32);
+            gl::DrawArrays(primitive, 0, (data.len() / 4) as i32);
         }
     }
 

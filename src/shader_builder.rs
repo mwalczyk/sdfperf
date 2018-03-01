@@ -42,7 +42,7 @@ impl ShaderBuilder {
             vec4 transforms[];
         };
 
-        const int MAX_STEPS = 128;
+        const int MAX_STEPS = 256;
         const float MAX_TRACE_DISTANCE = 64.0;
         const float MIN_HIT_DISTANCE = 0.001;
 
