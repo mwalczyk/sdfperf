@@ -21,6 +21,11 @@ mod renderer;
 mod shader_builder;
 mod texture;
 
+// TODO:
+// - Limit generators (i.e. sphere) to ONE output, since
+//   the current graph traversal code doesn't work if the
+//   same generator is connected to multiple other nodes
+
 use color::Color;
 use interaction::{MouseInfo, Panel};
 use operator::{Op, OpType};
@@ -127,6 +132,7 @@ fn main() {
                                         glutin::VirtualKeyCode::S => OpType::Sphere,
                                         glutin::VirtualKeyCode::B => OpType::Box,
                                         glutin::VirtualKeyCode::P => OpType::Plane,
+                                        glutin::VirtualKeyCode::T => OpType::Torus,
                                         glutin::VirtualKeyCode::U => OpType::Union,
                                         glutin::VirtualKeyCode::D => OpType::Subtraction,
                                         glutin::VirtualKeyCode::I => OpType::Intersection,

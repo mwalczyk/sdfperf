@@ -7,7 +7,7 @@ use graph::{Connected, Graph};
 use interaction::{InteractionState, MouseInfo, Panel};
 use operator::{Connectivity, Op, OpType};
 use preview::Preview;
-use renderer::{DrawParams, LineMode, LineConnectivity, Renderer};
+use renderer::{DrawParams, LineConnectivity, LineMode, Renderer};
 use texture::Texture;
 
 use std::cmp::max;
@@ -404,7 +404,7 @@ impl Network {
     /// operator and the op type.
     fn color_for_op(&self, op: &Op) -> Color {
         let mut color = match op.family {
-            OpType::Sphere | OpType::Box | OpType::Plane => Color::from_hex(0x8F719D, 1.0),
+            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => Color::from_hex(0x8F719D, 1.0),
             OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
                 Color::from_hex(0xA8B6C5, 1.0)
             }
@@ -536,13 +536,21 @@ impl Network {
     fn draw_grid(&mut self) {
         let draw_color = Color::from_hex(0x373737, 0.25);
         self.renderer.draw(
-            DrawParams::Line(&self.grid.points_vertical, LineMode::Solid, LineConnectivity::Segment),
+            DrawParams::Line(
+                &self.grid.points_vertical,
+                LineMode::Solid,
+                LineConnectivity::Segment,
+            ),
             &draw_color,
             None,
             None,
         );
         self.renderer.draw(
-            DrawParams::Line(&self.grid.points_horizontal, LineMode::Solid, LineConnectivity::Segment),
+            DrawParams::Line(
+                &self.grid.points_horizontal,
+                LineMode::Solid,
+                LineConnectivity::Segment,
+            ),
             &draw_color,
             None,
             None,

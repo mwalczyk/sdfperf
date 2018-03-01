@@ -104,6 +104,12 @@ impl ShaderBuilder {
             return p.y - h;
         }
 
+        float sdf_torus(in vec3 p, in vec2 t)
+        {
+            vec2 d = vec2(length(p.xz)- t.x, p.y);
+            return length(d) - t.y;
+        }
+
         vec2 map(in vec3 p)
         {
             // start of generated cod-
@@ -276,7 +282,9 @@ impl ShaderBuilder {
         for index in indices {
             if let Some(node) = network.graph.get_node(index) {
                 let mut formatted = match node.data.family {
-                    OpType::Sphere | OpType::Box | OpType::Plane => node.data.get_code(None, None),
+                    OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => {
+                        node.data.get_code(None, None)
+                    }
 
                     OpType::Union
                     | OpType::Subtraction

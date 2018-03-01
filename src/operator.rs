@@ -26,6 +26,9 @@ pub enum OpType {
     /// Generates a plane primitive
     Plane,
 
+    /// Generates a torus primitive
+    Torus,
+
     /// Merges two distance fields using a `min` operation
     Union,
 
@@ -54,6 +57,7 @@ impl OpType {
             OpType::Sphere => "sphere",
             OpType::Box => "box",
             OpType::Plane => "plane",
+            OpType::Torus => "torus",
             OpType::Union => "union",
             OpType::Subtraction => "subtraction",
             OpType::Intersection => "intersection",
@@ -64,7 +68,7 @@ impl OpType {
 
     pub fn get_connectivity(&self) -> Connectivity {
         match *self {
-            OpType::Sphere | OpType::Box | OpType::Plane => Connectivity::Output,
+            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => Connectivity::Output,
             OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
                 Connectivity::InputOutput
             }
@@ -78,7 +82,7 @@ impl OpType {
     /// unbounded number of other ops.
     pub fn get_input_capacity(&self) -> usize {
         match *self {
-            OpType::Sphere | OpType::Box | OpType::Plane => 0,
+            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => 0,
             OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => 2,
             OpType::Render => 1,
         }
@@ -117,6 +121,11 @@ impl OpType {
                 float s_NAME = transforms[INDEX].w;
                 vec3 t_NAME = transforms[INDEX].xyz;
                 float NAME = sdf_plane(p / s_NAME + t_NAME, -1.0) * s_NAME;"
+                .to_string(),
+            OpType::Torus => "
+                float s_NAME = transforms[INDEX].w;
+                vec3 t_NAME = transforms[INDEX].xyz;
+                float NAME = sdf_torus(p / s_NAME + t_NAME, vec2(1.0, 0.5)) * s_NAME;"
                 .to_string(),
             OpType::Union => "float NAME = op_union(INPUT_A, INPUT_B);".to_string(),
             OpType::Subtraction => "float NAME = op_subtract(INPUT_A, INPUT_B);".to_string(),
