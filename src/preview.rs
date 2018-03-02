@@ -131,7 +131,7 @@ impl Preview {
         Preview {
             program_valid: None,
             program_error,
-            bounds: Rect::new(Vector2::new(100.0, 000.0), Vector2::new(300.0, 300.0)),
+            bounds: Rect::new(Vector2::new(300.0, 000.0), Vector2::new(300.0, 300.0)),
             camera: VirtualCamera::new(),
             shading: Shading::Normals,
             ssbo,

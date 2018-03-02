@@ -5,7 +5,7 @@ use bounds::Rect;
 use color::Color;
 use graph::{Connected, Graph};
 use interaction::{InteractionState, MouseInfo, Panel};
-use operator::{Connectivity, Op, OpType};
+use operator::{ConnectionType, Connectivity, DomainType, Op, OpFamily, PrimitiveType};
 use preview::Preview;
 use renderer::{DrawParams, LineConnectivity, LineMode, Renderer};
 use texture::Texture;
@@ -28,7 +28,6 @@ use std::ffi::OsStr;
 /// Error:       0xA0502B (dark orange)
 /// Other:       0xFEC56D (yellow)
 ///
-
 pub struct Grid {
     size: Vector2<f32>,
     spacing: Vector2<usize>,
@@ -124,6 +123,10 @@ pub struct Network {
     /// A map of asset names to textures, used to render various
     /// UI elements
     assets: HashMap<String, Texture>,
+
+    /// A counter that is used to track the number of operators
+    /// in the current network that have parameters
+    params_index: usize,
 }
 
 enum Pair<T> {
@@ -161,6 +164,7 @@ impl Network {
             show_preview: true,
             snapping: true,
             assets: HashMap::new(),
+            params_index: 0,
         };
         network.load_assets();
         network
@@ -187,7 +191,10 @@ impl Network {
     pub fn scale_selected(&mut self, val: f32) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
-            node.data.transform.scale(val);
+
+            if let Some(ref mut params) = node.data.family.get_params_mut() {
+                params.data.w += val;
+            }
         }
     }
 
@@ -196,7 +203,12 @@ impl Network {
     pub fn translate_selected(&mut self, val: &Vector3<f32>) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
-            node.data.transform.translate(val);
+
+            if let Some(ref mut params) = node.data.family.get_params_mut() {
+                params.data.x += val.x;
+                params.data.y += val.y;
+                params.data.z += val.z;
+            }
         }
     }
 
@@ -221,7 +233,7 @@ impl Network {
             // will be moved, so its transform index needs
             // to be reset.
             if let Some(node) = self.graph.nodes.last_mut() {
-                node.data.transform.index = selected;
+                //TODO node.data.transform.index = selected;
             }
 
             // Finally, remove the node and reset the selection.
@@ -232,10 +244,19 @@ impl Network {
 
     /// Adds a new op of type `family` to the network at coordinates
     /// `position` and dimensions `size`.
-    pub fn add_op(&mut self, family: OpType, position: Vector2<f32>, size: Vector2<f32>) {
-        let index = self.graph.nodes.len();
-        let op = Op::new(index, family, position, size);
+    pub fn add_op(&mut self, mut family: OpFamily, position: Vector2<f32>, size: Vector2<f32>) {
+        // If this operator has parameters, we need to re-assign
+        // its parameter index so that the resulting shader code
+        // properly indexes into the SSBO of parameter data.
+        if let Some(ref mut params) = family.get_params_mut() {
+            params.index = self.params_index;
+            self.params_index += 1;
+        }
 
+        // Create the operator.
+        let op = Op::new(family, position, size);
+
+        // Add the operator to the current graph.
         self.graph.add_node(op, 0);
     }
 
@@ -253,7 +274,7 @@ impl Network {
 
             // If we are connecting to a render op, then the shader
             // must be rebuilt.
-            if let OpType::Render = node_b.data.family {
+            if let OpFamily::Primitive(PrimitiveType::Render) = node_b.data.family {
                 self.root = Some(b);
                 self.dirty = true;
                 println!("Connected to render node: building graph");
@@ -393,7 +414,7 @@ impl Network {
         self.draw_all_nodes();
 
         if self.show_preview {
-            self.gather_transforms();
+            self.gather_params();
 
             self.preview.prepare(self.renderer.get_projection());
             self.renderer.draw_rect_inner();
@@ -404,13 +425,18 @@ impl Network {
     /// operator and the op type.
     fn color_for_op(&self, op: &Op) -> Color {
         let mut color = match op.family {
-            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => {
-                Color::from_hex(0x8F719D, 1.0)
-            }
-            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
-                Color::from_hex(0xA8B6C5, 1.0)
-            }
-            OpType::Render => Color::from_hex(0xC77832, 1.0),
+            OpFamily::Domain(domain) => Color::from_hex(0x6F818E, 1.0),
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::Sphere
+                | PrimitiveType::Box
+                | PrimitiveType::Plane
+                | PrimitiveType::Torus => Color::from_hex(0x8F719D, 1.0),
+                PrimitiveType::Union
+                | PrimitiveType::Subtraction
+                | PrimitiveType::Intersection
+                | PrimitiveType::SmoothMinimum(_) => Color::from_hex(0xA8B6C5, 1.0),
+                PrimitiveType::Render => Color::from_hex(0xC77832, 1.0),
+            },
         };
 
         // Add a contribution based on the op's current interaction state.
@@ -482,7 +508,7 @@ impl Network {
         }
     }
 
-    fn draw_curve(&self, a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>, d: Vector2<f32>) {
+    fn curve_between(&self, a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>, d: Vector2<f32>) {
         const LOD: usize = 20;
         let mut points = Vec::with_capacity(LOD * 4);
 
@@ -512,24 +538,44 @@ impl Network {
         );
     }
 
+    fn line_between(&self, a: Vector2<f32>, b: Vector2<f32>) {
+        let points = vec![a.x, a.y, 0.0, 0.0, b.x, b.y, 1.0, 1.0];
+
+        self.renderer.draw(
+            DrawParams::Line(&points, LineMode::Dashed, LineConnectivity::Segment),
+            &Color::mono(0.75, 0.25),
+            None,
+            None,
+        );
+    }
+
     /// Draws all edges between ops in the network.
     fn draw_all_edges(&self) {
-        // let mut points = Vec::new();
-
         for (src, edges) in self.graph.edges.iter().enumerate() {
             for dst in edges.outputs.iter() {
                 let src_node = self.graph.get_node(src).unwrap();
                 let dst_node = self.graph.get_node(*dst).unwrap();
+                let src_family = src_node.data.family;
+                let dst_family = dst_node.data.family;
                 let src_centroid = src_node.data.bounds_output.centroid();
                 let dst_centroid = dst_node.data.bounds_input.centroid();
 
-                let a = src_centroid;
-                let d = dst_centroid;
-                let mid = (a + d) * 0.5;
+                match src_family.get_connection_type(dst_family) {
+                    ConnectionType::Direct => {
+                        let a = src_centroid;
+                        let d = dst_centroid;
+                        let mid = (a + d) * 0.5;
 
-                let b = Vector2::new(mid.x, a.y);
-                let c = Vector2::new(mid.x, d.y);
-                self.draw_curve(a, b, c, d);
+                        let b = Vector2::new(mid.x, a.y);
+                        let c = Vector2::new(mid.x, d.y);
+                        self.curve_between(a, b, c, d);
+                    }
+                    ConnectionType::Indirect => {
+                        self.line_between(src_centroid, dst_centroid);
+                    }
+                    // An invalid connection - this should never happen, in practice.
+                    _ => (),
+                }
             }
         }
     }
@@ -559,14 +605,16 @@ impl Network {
         );
     }
 
-    /// Aggregates all of the distance field transforms.
-    fn gather_transforms(&self) {
-        let mut transforms = Vec::new();
+    /// Aggregates all of the operator parameters.
+    fn gather_params(&self) {
+        let mut all_params = Vec::new();
         for node in self.graph.nodes.iter() {
-            transforms.push(node.data.transform.data);
+            if let Some(params) = node.data.family.get_params() {
+                all_params.push(params.data);
+            }
         }
 
-        self.preview.update_transforms(transforms);
+        self.preview.update_transforms(all_params);
     }
 
     /// Loads all texture assets.

@@ -32,7 +32,7 @@ mod texture;
 
 use color::Color;
 use interaction::{MouseInfo, Panel};
-use operator::{Op, OpType};
+use operator::{DomainType, Op, OpFamily, Parameters, PrimitiveType};
 use network::Network;
 use preview::Shading;
 use program::Program;
@@ -40,7 +40,7 @@ use renderer::Renderer;
 use shader_builder::ShaderBuilder;
 
 use glutin::GlContext;
-use cgmath::{Vector2, Vector3, Zero};
+use cgmath::{Vector2, Vector3, Vector4, Zero};
 
 fn clear() {
     unsafe {
@@ -53,7 +53,7 @@ fn clear() {
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
-        .with_dimensions(800, 600)
+        .with_dimensions(1200, 600)
         .with_title("signed-distance fields");
     let context = glutin::ContextBuilder::new().with_multisampling(4);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
@@ -63,7 +63,7 @@ fn main() {
     // Constants
     const ZOOM_INCREMENT: f32 = 0.05;
     const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
-    let mut current_size = Vector2::new(800.0, 600.0);
+    let mut current_size = Vector2::new(1200.0, 600.0);
 
     // Main objects
     let mut network = Network::new(current_size);
@@ -132,20 +132,65 @@ fn main() {
                             if let Some(key) = input.virtual_keycode {
                                 if input.modifiers.shift && key != glutin::VirtualKeyCode::LShift {
                                     // If the `shift` modifier is down, add a new op.
-                                    let op_type = match key {
-                                        glutin::VirtualKeyCode::S => OpType::Sphere,
-                                        glutin::VirtualKeyCode::B => OpType::Box,
-                                        glutin::VirtualKeyCode::P => OpType::Plane,
-                                        glutin::VirtualKeyCode::T => OpType::Torus,
-                                        glutin::VirtualKeyCode::U => OpType::Union,
-                                        glutin::VirtualKeyCode::D => OpType::Subtraction,
-                                        glutin::VirtualKeyCode::I => OpType::Intersection,
-                                        glutin::VirtualKeyCode::M => OpType::SmoothMinimum,
-                                        glutin::VirtualKeyCode::R => OpType::Render,
-                                        _ => OpType::Sphere,
+                                    let family = match key {
+                                        glutin::VirtualKeyCode::S => {
+                                            OpFamily::Primitive(PrimitiveType::Sphere)
+                                        }
+                                        glutin::VirtualKeyCode::B => {
+                                            OpFamily::Primitive(PrimitiveType::Box)
+                                        }
+                                        glutin::VirtualKeyCode::P => {
+                                            OpFamily::Primitive(PrimitiveType::Plane)
+                                        }
+                                        glutin::VirtualKeyCode::T => {
+                                            OpFamily::Primitive(PrimitiveType::Torus)
+                                        }
+                                        glutin::VirtualKeyCode::U => {
+                                            OpFamily::Primitive(PrimitiveType::Union)
+                                        }
+                                        glutin::VirtualKeyCode::D => {
+                                            OpFamily::Primitive(PrimitiveType::Subtraction)
+                                        }
+                                        glutin::VirtualKeyCode::I => {
+                                            OpFamily::Primitive(PrimitiveType::Intersection)
+                                        }
+                                        glutin::VirtualKeyCode::M => OpFamily::Primitive(
+                                            PrimitiveType::SmoothMinimum(Parameters::new(
+                                                Vector4::new(1.0, 0.0, 0.0, 0.0),
+                                                0,
+                                                Vector4::new(0.0, 0.0, 0.0, 0.0),
+                                                Vector4::new(1.0, 0.0, 0.0, 0.0),
+                                                Vector4::new(0.1, 0.0, 0.0, 0.0)
+                                            )),
+                                        ),
+                                        glutin::VirtualKeyCode::R => {
+                                            OpFamily::Primitive(PrimitiveType::Render)
+                                        }
+                                        glutin::VirtualKeyCode::Key1 => {
+                                            OpFamily::Domain(DomainType::Root)
+                                        }
+                                        glutin::VirtualKeyCode::Key2 => OpFamily::Domain(
+                                            DomainType::Transform(Parameters::new(
+                                                Vector4::new(0.0, 0.0, 0.0, 1.0),
+                                                0,
+                                                Vector4::new(-10.0, -10.0, -10.0, 0.1),
+                                                Vector4::new(10.0, 10.0, 10.0, 10.0),
+                                                Vector4::new(0.5, 0.5, 0.5, 0.1)
+                                            )),
+                                        ),
+                                        glutin::VirtualKeyCode::Key3 => {
+                                            OpFamily::Domain(DomainType::Twist(Parameters::new(
+                                                Vector4::new(4.0, 4.0, 0.0, 0.0),
+                                                0,
+                                                Vector4::new(0.0, 0.0, 0.0, 0.0),
+                                                Vector4::new(20.0, 20.0, 0.0, 0.0),
+                                                Vector4::new(1.0, 1.0, 0.0, 0.0)
+                                            )))
+                                        }
+                                        _ => OpFamily::Primitive(PrimitiveType::Sphere),
                                     };
                                     network.add_op(
-                                        op_type,
+                                        family,
                                         mouse.curr - OPERATOR_SIZE * 0.5,
                                         OPERATOR_SIZE,
                                     );

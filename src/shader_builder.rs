@@ -1,5 +1,5 @@
 use network::Network;
-use operator::{Op, OpType};
+use operator::{DomainType, Op, OpFamily, PrimitiveType};
 use program::Program;
 
 use uuid::Uuid;
@@ -37,9 +37,9 @@ impl ShaderBuilder {
         // Here, we pack each transform into a single `vec4` where
         // the xyz components represent a translation and the w
         // component represents a uniform scale.
-        layout (std430, binding = 0) buffer transforms_block
+        layout (std430, binding = 0) buffer params_block
         {
-            vec4 transforms[];
+            vec4 params[];
         };
 
         const int MAX_STEPS = 256;
@@ -65,6 +65,15 @@ impl ShaderBuilder {
             vec3 i = cross(k, vec3(0.0, 1.0, 0.0));
             vec3 j = cross(i, k);
             return mat3(i, j, k);
+        }
+
+        vec3 domain_twist(in vec3 p, float t)
+        {
+            float c = cos(t * p.y);
+            float s = sin(t * p.y);
+            mat2  m = mat2(c, -s, s, c);
+            vec3  q = vec3(m * p.xz, p.y);
+            return q;
         }
 
         float op_union(float a, float b)
@@ -282,47 +291,78 @@ impl ShaderBuilder {
         for index in indices {
             if let Some(node) = network.graph.get_node(index) {
                 let mut formatted = match node.data.family {
-                    OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => {
-                        node.data.get_code(None, None)
-                    }
+                    OpFamily::Domain(domain) => match domain {
+                        // Root operators have no inputs.
+                        DomainType::Root => node.data.get_code(None, None),
 
-                    OpType::Union
-                    | OpType::Subtraction
-                    | OpType::Intersection
-                    | OpType::SmoothMinimum => {
-                        // If this operator doesn't have at least 2 inputs,
-                        // then we exit early, since this isn't a valid
-                        // shader graph.
-                        if network.graph.edges[index].inputs.len() < 2 {
-                            return None;
+                        // All other domain operators have a single input.
+                        _ => {
+                            if network.graph.edges[index].inputs.len() < 1 {
+                                return None;
+                            }
+                            let a = network.graph.edges[index].inputs[0];
+                            node.data
+                                .get_code(Some(&network.graph.get_node(a).unwrap().data.name), None)
+                        }
+                    },
+
+                    OpFamily::Primitive(primitive) => match primitive {
+                        // All generators have a single input, corresponding to
+                        // their (potentially transformed) root.
+                        PrimitiveType::Sphere
+                        | PrimitiveType::Box
+                        | PrimitiveType::Plane
+                        | PrimitiveType::Torus => {
+                            if network.graph.edges[index].inputs.len() < 1 {
+                                return None;
+                            }
+                            let a = network.graph.edges[index].inputs[0];
+                            node.data
+                                .get_code(Some(&network.graph.get_node(a).unwrap().data.name), None)
                         }
 
-                        let a = network.graph.edges[index].inputs[0];
-                        let b = network.graph.edges[index].inputs[1];
-                        node.data.get_code(
-                            Some(&network.graph.get_node(a).unwrap().data.name),
-                            Some(&network.graph.get_node(b).unwrap().data.name),
-                        )
-                    }
+                        // All combinators have two inputs.
+                        PrimitiveType::Union
+                        | PrimitiveType::Subtraction
+                        | PrimitiveType::Intersection
+                        | PrimitiveType::SmoothMinimum(_) => {
+                            // If this operator doesn't have at least 2 inputs,
+                            // then we exit early, since this isn't a valid
+                            // shader graph.
+                            if network.graph.edges[index].inputs.len() < 2 {
+                                return None;
+                            }
 
-                    OpType::Render => {
-                        // If this operator doesn't have at least 1 input,
-                        // then we exit early, since this isn't a valid
-                        // shader graph.
-                        if network.graph.edges[index].inputs.len() < 1 {
-                            return None;
+                            let a = network.graph.edges[index].inputs[0];
+                            let b = network.graph.edges[index].inputs[1];
+                            node.data.get_code(
+                                Some(&network.graph.get_node(a).unwrap().data.name),
+                                Some(&network.graph.get_node(b).unwrap().data.name),
+                            )
                         }
 
-                        let a = network.graph.edges[index].inputs[0];
-                        let mut code = node.data
-                            .get_code(Some(&network.graph.get_node(a).unwrap().data.name), None);
+                        // The render operator only has a single input.
+                        PrimitiveType::Render => {
+                            // If this operator doesn't have at least 1 input,
+                            // then we exit early, since this isn't a valid
+                            // shader graph.
+                            if network.graph.edges[index].inputs.len() < 1 {
+                                return None;
+                            }
 
-                        // Add the final `return` in the `map(..)` function.
-                        code.push('\n');
-                        code.push('\t');
-                        code.push_str(&format!("return vec2(0.0, {});", &node.data.name));
-                        code
-                    }
+                            let a = network.graph.edges[index].inputs[0];
+                            let mut code = node.data.get_code(
+                                Some(&network.graph.get_node(a).unwrap().data.name),
+                                None,
+                            );
+
+                            // Add the final `return` in the `map(..)` function.
+                            code.push('\n');
+                            code.push('\t');
+                            code.push_str(&format!("return vec2(0.0, {});", &node.data.name));
+                            code
+                        }
+                    },
                 };
 
                 // Add a tab indent before each new line of shader code and a newline

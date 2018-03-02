@@ -115,8 +115,8 @@ impl Renderer {
             float alpha = u_draw_color.a;;
             if (u_draw_mode == DRAW_MODE_LINES_DASHED)
             {
-                const float stripes = 20.0;
-                alpha = max(step(0.5, fract(uv.s * stripes - u_time)), 0.5);
+                const float stripes = 10.0;
+                alpha = max(step(0.5, fract(uv.s * stripes - u_time)), 0.25);
             }
 
             // the alpha map overrides the default alpha

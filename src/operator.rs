@@ -25,96 +25,170 @@ pub enum ConnectionType {
     Indirect,
 
     /// An invalid connection
-    Incompatible
+    Invalid,
 }
 
-pub enum OpFamily {
-    Domain,
-        // Root (p)
-        // Transform (TRS)
-        // Twist
-        // Bend
-    Data,
-        // Time
-        // Math
-        // Sin
-        // Cos
-        // Noise
-    Primitive,
-        // Sphere
-        // Box
-        // Plane
-        // Torus
-        // Union
-        // Subtraction
-        // Intersection
-        // Smooth minimum
-        // *Render
-    Displacement,
-        // INPUT_A += noise(p_INPUT_A);
-        // Noise
-        // Sin
-        // Cos
+/// A struct representing a transformation that will be
+/// applied to a distance field. Here, the xyz coordinates
+/// of `data` represent a translation and the w-coordinate
+/// represents a uniform scale.
+#[derive(Copy, Clone, PartialEq)]
+pub struct Parameters {
+    pub data: Vector4<f32>,
+    pub index: usize,
+    pub min: Vector4<f32>,
+    pub max: Vector4<f32>,
+    pub step: Vector4<f32>,
 }
 
-#[derive(PartialEq, Eq)]
-pub enum OpType {
-    /// Generates a sphere primitive
+impl Parameters {
+    pub fn new(
+        data: Vector4<f32>,
+        index: usize,
+        min: Vector4<f32>,
+        max: Vector4<f32>,
+        step: Vector4<f32>,
+    ) -> Parameters {
+        Parameters {
+            data,
+            index,
+            min,
+            max,
+            step,
+        }
+    }
+
+    pub fn step_x(&mut self) {
+        self.data += self.step;
+        self.data.x.min(self.max.x).max(self.min.x);
+    }
+
+    pub fn step_x(&mut self) {
+        self.data += self.step;
+        self.data.x.min(self.max.x).max(self.min.x);
+    }
+
+    pub fn step_x(&mut self) {
+        self.data += self.step;
+        self.data.x.min(self.max.x).max(self.min.x);
+    }
+
+    pub fn step_x(&mut self) {
+        self.data += self.step;
+        self.data.x.min(self.max.x).max(self.min.x);
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum DomainType {
+    Root,
+    Transform(Parameters),
+    Twist(Parameters),
+    //Bend
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum DataType {
+    Time,
+    Math,
+    Sin,
+    Cos,
+    Noise,
+    Mouse,
+    Audio,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum PrimitiveType {
     Sphere,
-
-    /// Generates a box primitive
     Box,
-
-    /// Generates a plane primitive
     Plane,
-
-    /// Generates a torus primitive
     Torus,
-
-    /// Merges two distance fields using a `min` operation
     Union,
-
-    /// Merges two distance fields using a `max` operation and negation
     Subtraction,
-
-    /// Merges two distance fields using a `max` operation
     Intersection,
-
-    /// Merges two distance fields using a `smooth_min` operation
-    SmoothMinimum,
-
-    /// Final output node, required to render the graph
+    SmoothMinimum(Parameters),
     Render,
-    // TODO (materials): AmbientOcclusion, Normals, Phong, Constant
-    // TODO (transforms): Scale, Translate, Rotate
-    // TODO (repeaters): ModRepeat, ModRepeatCircular
-    // TODO (displacers): PerlinNoise, FBMNoise
-    // TODO (data): Sin, Cos, Time, Noise, Random
 }
 
-impl OpType {
-    /// Converts the enum variant into a human-readable string format.
+#[derive(Copy, Clone, PartialEq)]
+pub enum DisplacementType {
+    Noise,
+    Sin,
+    Cos,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum OpFamily {
+    //Data,
+    //Displacement,
+    Domain(DomainType),
+    Primitive(PrimitiveType),
+    // INPUT_A += noise(p_INPUT_A);
+}
+
+impl OpFamily {
+    /// Converts the nested enum variant into a human-readable string format.
     pub fn to_string(&self) -> &'static str {
         match *self {
-            OpType::Sphere => "sphere",
-            OpType::Box => "box",
-            OpType::Plane => "plane",
-            OpType::Torus => "torus",
-            OpType::Union => "union",
-            OpType::Subtraction => "subtraction",
-            OpType::Intersection => "intersection",
-            OpType::SmoothMinimum => "smooth_minimum",
-            OpType::Render => "render",
+            OpFamily::Domain(domain) => match domain {
+                DomainType::Root => "root",
+                DomainType::Transform(_) => "transform",
+                DomainType::Twist(_) => "twist",
+            },
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::Sphere => "sphere",
+                PrimitiveType::Box => "box",
+                PrimitiveType::Plane => "plane",
+                PrimitiveType::Torus => "torus",
+                PrimitiveType::Union => "union",
+                PrimitiveType::Subtraction => "subtraction",
+                PrimitiveType::Intersection => "intersection",
+                PrimitiveType::SmoothMinimum(_) => "smooth_minimum",
+                PrimitiveType::Render => "render",
+            },
+        }
+    }
+
+    pub fn get_params(&self) -> Option<&Parameters> {
+        match *self {
+            OpFamily::Domain(ref domain) => match *domain {
+                DomainType::Transform(ref params) | DomainType::Twist(ref params) => {
+                    return Some(params)
+                }
+                _ => None,
+            },
+            OpFamily::Primitive(ref primitive) => match *primitive {
+                PrimitiveType::SmoothMinimum(ref params) => return Some(params),
+                _ => None,
+            },
+        }
+    }
+
+    pub fn get_params_mut(&mut self) -> Option<&mut Parameters> {
+        match *self {
+            OpFamily::Domain(ref mut domain) => match *domain {
+                DomainType::Transform(ref mut params) => return Some(params),
+                DomainType::Twist(ref mut params) => return Some(params),
+                _ => None,
+            },
+            OpFamily::Primitive(ref mut primitive) => match *primitive {
+                PrimitiveType::SmoothMinimum(ref mut params) => return Some(params),
+                _ => None,
+            },
         }
     }
 
     pub fn get_connectivity(&self) -> Connectivity {
         match *self {
-            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => Connectivity::Output,
-            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => {
-                Connectivity::InputOutput
-            }
-            OpType::Render => Connectivity::Input,
+            OpFamily::Domain(domain) => match domain {
+                DomainType::Root => Connectivity::Output,
+                _ => Connectivity::InputOutput,
+            },
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::Render => Connectivity::Input,
+                _ => Connectivity::InputOutput,
+            },
         }
     }
 
@@ -124,9 +198,17 @@ impl OpType {
     /// unbounded number of other ops.
     pub fn get_input_capacity(&self) -> usize {
         match *self {
-            OpType::Sphere | OpType::Box | OpType::Plane | OpType::Torus => 0,
-            OpType::Union | OpType::Subtraction | OpType::Intersection | OpType::SmoothMinimum => 2,
-            OpType::Render => 1,
+            OpFamily::Domain(domain) => match domain {
+                DomainType::Root => 0,
+                _ => 1,
+            },
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::Union
+                | PrimitiveType::Subtraction
+                | PrimitiveType::Intersection
+                | PrimitiveType::SmoothMinimum(_) => 2,
+                _ => 1,
+            },
         }
     }
 
@@ -140,73 +222,93 @@ impl OpType {
     /// op's input slot and `false` otherwise.
     pub fn has_outputs(&self) -> bool {
         match *self {
-            OpType::Render => false,
-            _ => true,
+            OpFamily::Domain(domain) => true,
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::Render => false,
+                _ => true,
+            },
         }
     }
 
     pub fn get_code_template(&self) -> String {
-        // In all branches, `p` refers to the current position along the ray,
-        // i.e. the variable used in the `map` function.
         match *self {
-            OpType::Sphere => "
-                float s_NAME = transforms[INDEX].w;
-                vec3 t_NAME = transforms[INDEX].xyz;
-                float NAME = sdf_sphere(p / s_NAME + t_NAME, vec3(0.0), 1.0) * s_NAME;"
-                .to_string(),
-            OpType::Box => "
-                float s_NAME = transforms[INDEX].w;
-                vec3 t_NAME = transforms[INDEX].xyz;
-                float NAME = sdf_box(p / s_NAME + t_NAME, vec3(1.0)) * s_NAME;"
-                .to_string(),
-            OpType::Plane => "
-                float s_NAME = transforms[INDEX].w;
-                vec3 t_NAME = transforms[INDEX].xyz;
-                float NAME = sdf_plane(p / s_NAME + t_NAME, -1.0) * s_NAME;"
-                .to_string(),
-            OpType::Torus => "
-                float s_NAME = transforms[INDEX].w;
-                vec3 t_NAME = transforms[INDEX].xyz;
-                float NAME = sdf_torus(p / s_NAME + t_NAME, vec2(1.0, 0.5)) * s_NAME;"
-                .to_string(),
-            OpType::Union => "float NAME = op_union(INPUT_A, INPUT_B);".to_string(),
-            OpType::Subtraction => "float NAME = op_subtract(INPUT_A, INPUT_B);".to_string(),
-            OpType::Intersection => "float NAME = op_intersect(INPUT_A, INPUT_B);".to_string(),
-            OpType::SmoothMinimum => {
-                "float NAME = op_smooth_min(INPUT_A, INPUT_B, 1.0);".to_string()
-            }
-            OpType::Render => "float NAME = INPUT_A;".to_string(),
+            OpFamily::Domain(domain) => match domain {
+                DomainType::Root => "
+                    vec3 p_NAME = p;
+                    float s_NAME = 1.0;"
+                    .to_string(),
+                DomainType::Transform(_) => "
+                    float s_NAME = params[INDEX].w * s_INPUT_A;
+                    vec3 t_NAME = params[INDEX].xyz;
+                    vec3 p_NAME = p_INPUT_A / s_NAME + t_NAME;"
+                    .to_string(),
+                DomainType::Twist(_) => "
+                    float s_NAME = s_INPUT_A;
+                    vec3 p_NAME = domain_twist(p_INPUT_A, params[INDEX].x);"
+                    .to_string(),
+            },
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::Sphere => {
+                    "float NAME = sdf_sphere(p_INPUT_A, vec3(0.0), 1.0) * s_INPUT_A;".to_string()
+                }
+                PrimitiveType::Box => {
+                    "float NAME = sdf_box(p_INPUT_A, vec3(1.0)) * s_INPUT_A;".to_string()
+                }
+                PrimitiveType::Plane => {
+                    "float NAME = sdf_plane(p_INPUT_A, -1.0) * s_INPUT_A;".to_string()
+                }
+                PrimitiveType::Torus => {
+                    "float NAME = sdf_torus(p_INPUT_A, vec2(1.0, 0.5)) * s_INPUT_A;".to_string()
+                }
+                PrimitiveType::Union => "float NAME = op_union(INPUT_A, INPUT_B);".to_string(),
+                PrimitiveType::Subtraction => {
+                    "float NAME = op_subtract(INPUT_A, INPUT_B);".to_string()
+                }
+                PrimitiveType::Intersection => {
+                    "float NAME = op_intersect(INPUT_A, INPUT_B);".to_string()
+                }
+                PrimitiveType::SmoothMinimum(_) => {
+                    "float NAME = op_smooth_min(INPUT_A, INPUT_B, params[INDEX].x);".to_string()
+                }
+                PrimitiveType::Render => "float NAME = INPUT_A;".to_string(),
+            },
         }
     }
-}
 
-pub enum Slot {
-    Input(Rect),
-    Output(Rect),
-}
-
-/// A struct representing a transformation that will be
-/// applied to a distance field. Here, the xyz coordinates
-/// of `data` represent a translation and the w-coordinate
-/// represents a uniform scale.
-pub struct Transform {
-    pub data: Vector4<f32>,
-    pub index: usize,
-}
-
-impl Transform {
-    pub fn new(data: Vector4<f32>, index: usize) -> Transform {
-        Transform { data, index }
+    pub fn can_connect_to(&self, other: OpFamily) -> bool {
+        match *self {
+            // This operator is a domain operator.
+            OpFamily::Domain(domain) => match other {
+                OpFamily::Domain(other_domain) => return true,
+                OpFamily::Primitive(other_primitive) => match other_primitive {
+                    PrimitiveType::Sphere
+                    | PrimitiveType::Box
+                    | PrimitiveType::Plane
+                    | PrimitiveType::Torus => return true,
+                    _ => return false,
+                },
+            },
+            // This operator is a primitive operator.
+            OpFamily::Primitive(primitive) => match other {
+                OpFamily::Domain(other_domain) => return false,
+                OpFamily::Primitive(other_primitive) => return true,
+            },
+        }
     }
 
-    pub fn translate(&mut self, val: &Vector3<f32>) {
-        self.data.x += val.x;
-        self.data.y += val.y;
-        self.data.z += val.z;
-    }
-
-    pub fn scale(&mut self, val: f32) {
-        self.data.w += val;
+    pub fn get_connection_type(&self, other: OpFamily) -> ConnectionType {
+        match *self {
+            // This operator is a domain operator.
+            OpFamily::Domain(domain) => match other {
+                OpFamily::Domain(other_domain) => ConnectionType::Direct,
+                OpFamily::Primitive(other_primitive) => ConnectionType::Indirect,
+            },
+            // This operator is a primitive operator.
+            OpFamily::Primitive(primitive) => match other {
+                OpFamily::Domain(other_domain) => ConnectionType::Invalid,
+                OpFamily::Primitive(other_primitive) => ConnectionType::Direct,
+            },
+        }
     }
 }
 
@@ -235,16 +337,12 @@ pub struct Op {
     /// The name of the op (i.e. "sphere_0") as it will appear in the shader
     pub name: String,
 
-    /// The op type
-    pub family: OpType,
-
-    /// The transform (translation and scale) that will be applied to the
-    /// distance field represented by this op
-    pub transform: Transform,
+    /// The op family
+    pub family: OpFamily,
 }
 
 impl Op {
-    pub fn new(index: usize, family: OpType, position: Vector2<f32>, size: Vector2<f32>) -> Op {
+    pub fn new(family: OpFamily, position: Vector2<f32>, size: Vector2<f32>) -> Op {
         // Increment counter.
         let count = COUNTER.fetch_add(1, Ordering::SeqCst);
 
@@ -272,7 +370,6 @@ impl Op {
             uuid: Uuid::new_v4(),
             name,
             family,
-            transform: Transform::new(Vector4::new(0.0, 0.0, 0.0, 1.0), index),
         }
     }
 
@@ -289,7 +386,11 @@ impl Op {
     pub fn get_code(&self, input_a: Option<&str>, input_b: Option<&str>) -> String {
         let mut code = self.family.get_code_template();
         code = code.replace("NAME", &self.name);
-        code = code.replace("INDEX", &self.transform.index.to_string());
+
+        // Populate params.
+        if let Some(ref params) = self.family.get_params() {
+            code = code.replace("INDEX", &params.index.to_string());
+        }
 
         if let Some(a) = input_a {
             code = code.replace("INPUT_A", a);
