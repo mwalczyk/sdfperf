@@ -154,38 +154,20 @@ fn main() {
                                         glutin::VirtualKeyCode::I => {
                                             OpFamily::Primitive(PrimitiveType::Intersection)
                                         }
-                                        glutin::VirtualKeyCode::M => OpFamily::Primitive(
-                                            PrimitiveType::SmoothMinimum(Parameters::new(
-                                                Vector4::new(1.0, 0.0, 0.0, 0.0),
-                                                0,
-                                                Vector4::new(0.0, 0.0, 0.0, 0.0),
-                                                Vector4::new(1.0, 0.0, 0.0, 0.0),
-                                                Vector4::new(0.1, 0.0, 0.0, 0.0)
-                                            )),
-                                        ),
+                                        glutin::VirtualKeyCode::M => {
+                                            OpFamily::Primitive(PrimitiveType::SmoothMinimum)
+                                        }
                                         glutin::VirtualKeyCode::R => {
                                             OpFamily::Primitive(PrimitiveType::Render)
                                         }
                                         glutin::VirtualKeyCode::Key1 => {
                                             OpFamily::Domain(DomainType::Root)
                                         }
-                                        glutin::VirtualKeyCode::Key2 => OpFamily::Domain(
-                                            DomainType::Transform(Parameters::new(
-                                                Vector4::new(0.0, 0.0, 0.0, 1.0),
-                                                0,
-                                                Vector4::new(-10.0, -10.0, -10.0, 0.1),
-                                                Vector4::new(10.0, 10.0, 10.0, 10.0),
-                                                Vector4::new(0.5, 0.5, 0.5, 0.1)
-                                            )),
-                                        ),
+                                        glutin::VirtualKeyCode::Key2 => {
+                                            OpFamily::Domain(DomainType::Transform)
+                                        }
                                         glutin::VirtualKeyCode::Key3 => {
-                                            OpFamily::Domain(DomainType::Twist(Parameters::new(
-                                                Vector4::new(4.0, 4.0, 0.0, 0.0),
-                                                0,
-                                                Vector4::new(0.0, 0.0, 0.0, 0.0),
-                                                Vector4::new(20.0, 20.0, 0.0, 0.0),
-                                                Vector4::new(1.0, 1.0, 0.0, 0.0)
-                                            )))
+                                            OpFamily::Domain(DomainType::Twist)
                                         }
                                         _ => OpFamily::Primitive(PrimitiveType::Sphere),
                                     };
@@ -216,22 +198,52 @@ fn main() {
                                             network.preview.set_shading(Shading::Normals)
                                         }
                                         glutin::VirtualKeyCode::Equals => {
-                                            network.increment_param(&Vector4::new(0.0, 0.0, 0.0, 0.05));
+                                            network.increment_param(&Vector4::new(
+                                                0.0,
+                                                0.0,
+                                                0.0,
+                                                0.05,
+                                            ));
                                         }
                                         glutin::VirtualKeyCode::Minus => {
-                                            network.increment_param(&Vector4::new(0.0, 0.0, 0.0, -0.05));
+                                            network.increment_param(&Vector4::new(
+                                                0.0,
+                                                0.0,
+                                                0.0,
+                                                -0.05,
+                                            ));
                                         }
                                         glutin::VirtualKeyCode::Left => {
-                                            network.increment_param(&Vector4::new(0.05, 0.0, 0.0, 0.0));
+                                            network.increment_param(&Vector4::new(
+                                                0.05,
+                                                0.0,
+                                                0.0,
+                                                0.0,
+                                            ));
                                         }
                                         glutin::VirtualKeyCode::Right => {
-                                            network.increment_param(&Vector4::new(-0.05, 0.0, 0.0, 0.0));
+                                            network.increment_param(&Vector4::new(
+                                                -0.05,
+                                                0.0,
+                                                0.0,
+                                                0.0,
+                                            ));
                                         }
                                         glutin::VirtualKeyCode::Up => {
-                                            network.increment_param(&Vector4::new(0.0, -0.05, 0.0, 0.0));
+                                            network.increment_param(&Vector4::new(
+                                                0.0,
+                                                -0.05,
+                                                0.0,
+                                                0.0,
+                                            ));
                                         }
                                         glutin::VirtualKeyCode::Down => {
-                                            network.increment_param(&Vector4::new(0.0, 0.05, 0.0, 0.0));
+                                            network.increment_param(&Vector4::new(
+                                                0.0,
+                                                0.05,
+                                                0.0,
+                                                0.0,
+                                            ));
                                         }
                                         _ => (),
                                     }

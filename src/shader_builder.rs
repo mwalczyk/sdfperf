@@ -325,7 +325,7 @@ impl ShaderBuilder {
                         PrimitiveType::Union
                         | PrimitiveType::Subtraction
                         | PrimitiveType::Intersection
-                        | PrimitiveType::SmoothMinimum(_) => {
+                        | PrimitiveType::SmoothMinimum => {
                             // If this operator doesn't have at least 2 inputs,
                             // then we exit early, since this isn't a valid
                             // shader graph.

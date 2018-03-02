@@ -192,12 +192,11 @@ impl Network {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
 
-            if let Some(ref mut params) = node.data.family.get_params_mut() {
-                params.data.x += val.x;
-                params.data.y += val.y;
-                params.data.z += val.z;
-                params.data.w += val.w;
-            }
+            let params = node.data.get_params_mut();
+            params.data.x += val.x;
+            params.data.y += val.y;
+            params.data.z += val.z;
+            params.data.w += val.w;
         }
     }
 
@@ -234,16 +233,14 @@ impl Network {
     /// Adds a new op of type `family` to the network at coordinates
     /// `position` and dimensions `size`.
     pub fn add_op(&mut self, mut family: OpFamily, position: Vector2<f32>, size: Vector2<f32>) {
-        // If this operator has parameters, we need to re-assign
-        // its parameter index so that the resulting shader code
-        // properly indexes into the SSBO of parameter data.
-        if let Some(ref mut params) = family.get_params_mut() {
-            params.index = self.params_index;
-            self.params_index += 1;
-        }
-
         // Create the operator.
-        let op = Op::new(family, position, size);
+        let mut op = Op::new(family, position, size);
+
+        // We need to re-assign this op's parameter index so
+        // that the resulting shader code properly indexes into
+        // the SSBO of parameter data.
+        op.params.index = self.params_index;
+        self.params_index += 1;
 
         // Add the operator to the current graph.
         self.graph.add_node(op, 0);
@@ -423,7 +420,7 @@ impl Network {
                 PrimitiveType::Union
                 | PrimitiveType::Subtraction
                 | PrimitiveType::Intersection
-                | PrimitiveType::SmoothMinimum(_) => Color::from_hex(0xA8B6C5, 1.0),
+                | PrimitiveType::SmoothMinimum => Color::from_hex(0xA8B6C5, 1.0),
                 PrimitiveType::Render => Color::from_hex(0xC77832, 1.0),
             },
         };
@@ -598,9 +595,7 @@ impl Network {
     fn gather_params(&self) {
         let mut all_params = Vec::new();
         for node in self.graph.nodes.iter() {
-            if let Some(params) = node.data.family.get_params() {
-                all_params.push(params.data);
-            }
+            all_params.push(node.data.params.data);
         }
 
         self.preview.update_transforms(all_params);

@@ -59,11 +59,23 @@ impl Parameters {
     }
 }
 
+impl Default for Parameters {
+    fn default() -> Self {
+        Parameters::new(
+            Vector4::zero(),
+            0,
+            Vector4::zero(),
+            Vector4::zero(),
+            Vector4::zero(),
+        )
+    }
+}
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum DomainType {
     Root,
-    Transform(Parameters),
-    Twist(Parameters),
+    Transform,
+    Twist,
     //Bend
 }
 
@@ -87,7 +99,7 @@ pub enum PrimitiveType {
     Union,
     Subtraction,
     Intersection,
-    SmoothMinimum(Parameters),
+    SmoothMinimum,
     Render,
 }
 
@@ -113,8 +125,8 @@ impl OpFamily {
         match *self {
             OpFamily::Domain(domain) => match domain {
                 DomainType::Root => "root",
-                DomainType::Transform(_) => "transform",
-                DomainType::Twist(_) => "twist",
+                DomainType::Transform => "transform",
+                DomainType::Twist => "twist",
             },
             OpFamily::Primitive(primitive) => match primitive {
                 PrimitiveType::Sphere => "sphere",
@@ -124,37 +136,8 @@ impl OpFamily {
                 PrimitiveType::Union => "union",
                 PrimitiveType::Subtraction => "subtraction",
                 PrimitiveType::Intersection => "intersection",
-                PrimitiveType::SmoothMinimum(_) => "smooth_minimum",
+                PrimitiveType::SmoothMinimum => "smooth_minimum",
                 PrimitiveType::Render => "render",
-            },
-        }
-    }
-
-    pub fn get_params(&self) -> Option<&Parameters> {
-        match *self {
-            OpFamily::Domain(ref domain) => match *domain {
-                DomainType::Transform(ref params) | DomainType::Twist(ref params) => {
-                    return Some(params)
-                }
-                _ => None,
-            },
-            OpFamily::Primitive(ref primitive) => match *primitive {
-                PrimitiveType::SmoothMinimum(ref params) => return Some(params),
-                _ => None,
-            },
-        }
-    }
-
-    pub fn get_params_mut(&mut self) -> Option<&mut Parameters> {
-        match *self {
-            OpFamily::Domain(ref mut domain) => match *domain {
-                DomainType::Transform(ref mut params) => return Some(params),
-                DomainType::Twist(ref mut params) => return Some(params),
-                _ => None,
-            },
-            OpFamily::Primitive(ref mut primitive) => match *primitive {
-                PrimitiveType::SmoothMinimum(ref mut params) => return Some(params),
-                _ => None,
             },
         }
     }
@@ -186,7 +169,7 @@ impl OpFamily {
                 PrimitiveType::Union
                 | PrimitiveType::Subtraction
                 | PrimitiveType::Intersection
-                | PrimitiveType::SmoothMinimum(_) => 2,
+                | PrimitiveType::SmoothMinimum => 2,
                 _ => 1,
             },
         }
@@ -217,12 +200,12 @@ impl OpFamily {
                     vec3 p_NAME = p;
                     float s_NAME = 1.0;"
                     .to_string(),
-                DomainType::Transform(_) => "
+                DomainType::Transform => "
                     float s_NAME = params[INDEX].w * s_INPUT_A;
                     vec3 t_NAME = params[INDEX].xyz;
                     vec3 p_NAME = p_INPUT_A / s_NAME + t_NAME;"
                     .to_string(),
-                DomainType::Twist(_) => "
+                DomainType::Twist => "
                     float s_NAME = s_INPUT_A;
                     vec3 p_NAME = domain_twist(p_INPUT_A, params[INDEX].x);"
                     .to_string(),
@@ -247,7 +230,7 @@ impl OpFamily {
                 PrimitiveType::Intersection => {
                     "float NAME = op_intersect(INPUT_A, INPUT_B);".to_string()
                 }
-                PrimitiveType::SmoothMinimum(_) => {
+                PrimitiveType::SmoothMinimum => {
                     "float NAME = op_smooth_min(INPUT_A, INPUT_B, params[INDEX].x);".to_string()
                 }
                 PrimitiveType::Render => "float NAME = INPUT_A;".to_string(),
@@ -290,6 +273,38 @@ impl OpFamily {
             },
         }
     }
+
+    pub fn get_default_params(&self) -> Parameters {
+        match *self {
+            OpFamily::Domain(domain) => match domain {
+                DomainType::Transform => Parameters::new(
+                    Vector4::new(0.0, 0.0, 0.0, 1.0),
+                    0,
+                    Vector4::new(-10.0, -10.0, -10.0, 0.1),
+                    Vector4::new(10.0, 10.0, 10.0, 10.0),
+                    Vector4::new(0.5, 0.5, 0.5, 0.1),
+                ),
+                DomainType::Twist => Parameters::new(
+                    Vector4::new(4.0, 4.0, 0.0, 0.0),
+                    0,
+                    Vector4::new(0.0, 0.0, 0.0, 0.0),
+                    Vector4::new(20.0, 20.0, 0.0, 0.0),
+                    Vector4::new(1.0, 1.0, 0.0, 0.0),
+                ),
+                _ => Parameters::default(),
+            },
+            OpFamily::Primitive(primitive) => match primitive {
+                PrimitiveType::SmoothMinimum => Parameters::new(
+                    Vector4::new(1.0, 0.0, 0.0, 0.0),
+                    0,
+                    Vector4::new(0.0, 0.0, 0.0, 0.0),
+                    Vector4::new(1.0, 0.0, 0.0, 0.0),
+                    Vector4::new(0.1, 0.0, 0.0, 0.0),
+                ),
+                _ => Parameters::default(),
+            },
+        }
+    }
 }
 
 pub struct Op {
@@ -319,6 +334,9 @@ pub struct Op {
 
     /// The op family
     pub family: OpFamily,
+
+    /// This op's parameters, which may or may not be used by the shader
+    pub params: Parameters,
 }
 
 impl Op {
@@ -350,6 +368,7 @@ impl Op {
             uuid: Uuid::new_v4(),
             name,
             family,
+            params: family.get_default_params(),
         }
     }
 
@@ -367,10 +386,7 @@ impl Op {
         let mut code = self.family.get_code_template();
         code = code.replace("NAME", &self.name);
 
-        // Populate params.
-        if let Some(ref params) = self.family.get_params() {
-            code = code.replace("INDEX", &params.index.to_string());
-        }
+        code = code.replace("INDEX", &self.params.index.to_string());
 
         if let Some(a) = input_a {
             code = code.replace("INPUT_A", a);
@@ -379,6 +395,14 @@ impl Op {
             code = code.replace("INPUT_B", b);
         }
         code
+    }
+
+    pub fn get_params(&self) -> &Parameters {
+        &self.params
+    }
+
+    pub fn get_params_mut(&mut self) -> &mut Parameters {
+        &mut self.params
     }
 }
 
