@@ -216,24 +216,22 @@ fn main() {
                                             network.preview.set_shading(Shading::Normals)
                                         }
                                         glutin::VirtualKeyCode::Equals => {
-                                            network.scale_selected(0.05);
+                                            network.increment_param(&Vector4::new(0.0, 0.0, 0.0, 0.05));
                                         }
                                         glutin::VirtualKeyCode::Minus => {
-                                            network.scale_selected(-0.05);
+                                            network.increment_param(&Vector4::new(0.0, 0.0, 0.0, -0.05));
                                         }
                                         glutin::VirtualKeyCode::Left => {
-                                            network.translate_selected(&(Vector3::unit_x() * 0.05));
+                                            network.increment_param(&Vector4::new(0.05, 0.0, 0.0, 0.0));
                                         }
                                         glutin::VirtualKeyCode::Right => {
-                                            network
-                                                .translate_selected(&(Vector3::unit_x() * -0.05));
+                                            network.increment_param(&Vector4::new(-0.05, 0.0, 0.0, 0.0));
                                         }
                                         glutin::VirtualKeyCode::Up => {
-                                            network
-                                                .translate_selected(&(Vector3::unit_y() * -0.05));
+                                            network.increment_param(&Vector4::new(0.0, -0.05, 0.0, 0.0));
                                         }
                                         glutin::VirtualKeyCode::Down => {
-                                            network.translate_selected(&(Vector3::unit_y() * 0.05));
+                                            network.increment_param(&Vector4::new(0.0, 0.05, 0.0, 0.0));
                                         }
                                         _ => (),
                                     }

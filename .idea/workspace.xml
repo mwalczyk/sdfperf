@@ -2,13 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5a55896d-0f86-46ac-bce9-9b3308ba49a0" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/assets/icons.svg" afterPath="$PROJECT_DIR$/assets/icons.svg" />
       <change beforePath="$PROJECT_DIR$/src/main.rs" afterPath="$PROJECT_DIR$/src/main.rs" />
       <change beforePath="$PROJECT_DIR$/src/network.rs" afterPath="$PROJECT_DIR$/src/network.rs" />
       <change beforePath="$PROJECT_DIR$/src/operator.rs" afterPath="$PROJECT_DIR$/src/operator.rs" />
-      <change beforePath="$PROJECT_DIR$/src/preview.rs" afterPath="$PROJECT_DIR$/src/preview.rs" />
-      <change beforePath="$PROJECT_DIR$/src/renderer.rs" afterPath="$PROJECT_DIR$/src/renderer.rs" />
-      <change beforePath="$PROJECT_DIR$/src/shader_builder.rs" afterPath="$PROJECT_DIR$/src/shader_builder.rs" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -26,7 +22,7 @@
           <file leaf-file-name="interaction.rs" pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/src/interaction.rs">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="440">
+                <state relative-caret-position="1340">
                   <caret line="69" column="0" lean-forward="false" selection-start-line="69" selection-start-column="0" selection-end-line="69" selection-end-column="0" />
                   <folding>
                     <element signature="e#1897#1898#0" expanded="true" />
@@ -63,18 +59,18 @@
           <file leaf-file-name="main.rs" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/main.rs">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="-380">
-                  <caret line="187" column="47" lean-forward="true" selection-start-line="187" selection-start-column="47" selection-end-line="187" selection-end-column="47" />
+                <state relative-caret-position="220">
+                  <caret line="218" column="68" lean-forward="false" selection-start-line="218" selection-start-column="68" selection-end-line="218" selection-end-column="68" />
                   <folding />
                 </state>
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="texture.rs" pinned="false" current-in-tab="true">
+          <file leaf-file-name="texture.rs" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/texture.rs">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="1120">
-                  <caret line="56" column="35" lean-forward="false" selection-start-line="56" selection-start-column="35" selection-end-line="56" selection-end-column="35" />
+                <state relative-caret-position="340">
+                  <caret line="17" column="14" lean-forward="true" selection-start-line="17" selection-start-column="14" selection-end-line="17" selection-end-column="14" />
                   <folding />
                 </state>
               </provider>
@@ -83,32 +79,32 @@
           <file leaf-file-name="operator.rs" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/operator.rs">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="440">
-                  <caret line="75" column="17" lean-forward="false" selection-start-line="75" selection-start-column="16" selection-end-line="75" selection-end-column="17" />
+                <state relative-caret-position="260">
+                  <caret line="58" column="5" lean-forward="false" selection-start-line="58" selection-start-column="5" selection-end-line="58" selection-end-column="5" />
                   <folding>
-                    <element signature="e#5983#5984#0" expanded="true" />
-                    <element signature="e#6027#6028#0" expanded="true" />
-                    <element signature="e#12849#12850#0" expanded="true" />
-                    <element signature="e#12888#12889#0" expanded="true" />
-                    <element signature="e#12925#12926#0" expanded="true" />
-                    <element signature="e#12965#12966#0" expanded="true" />
-                    <element signature="e#13152#13153#0" expanded="true" />
-                    <element signature="e#13194#13195#0" expanded="true" />
-                    <element signature="e#13226#13227#0" expanded="true" />
-                    <element signature="e#13265#13266#0" expanded="true" />
-                    <element signature="e#13300#13301#0" expanded="true" />
-                    <element signature="e#13339#13340#0" expanded="true" />
-                    <marker date="1519954246308" expanded="true" signature="12782:12788" ph="{...}" />
+                    <element signature="e#5491#5492#0" expanded="true" />
+                    <element signature="e#5535#5536#0" expanded="true" />
+                    <element signature="e#12357#12358#0" expanded="true" />
+                    <element signature="e#12396#12397#0" expanded="true" />
+                    <element signature="e#12433#12434#0" expanded="true" />
+                    <element signature="e#12473#12474#0" expanded="true" />
+                    <element signature="e#12660#12661#0" expanded="true" />
+                    <element signature="e#12702#12703#0" expanded="true" />
+                    <element signature="e#12734#12735#0" expanded="true" />
+                    <element signature="e#12773#12774#0" expanded="true" />
+                    <element signature="e#12808#12809#0" expanded="true" />
+                    <element signature="e#12847#12848#0" expanded="true" />
+                    <marker date="1519958793482" expanded="true" signature="12290:12296" ph="{...}" />
                   </folding>
                 </state>
               </provider>
             </entry>
           </file>
-          <file leaf-file-name="network.rs" pinned="false" current-in-tab="false">
+          <file leaf-file-name="network.rs" pinned="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/src/network.rs">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="380">
-                  <caret line="200" column="35" lean-forward="false" selection-start-line="200" selection-start-column="35" selection-end-line="200" selection-end-column="35" />
+                <state relative-caret-position="140">
+                  <caret line="188" column="43" lean-forward="false" selection-start-line="188" selection-start-column="43" selection-end-line="188" selection-end-column="43" />
                   <folding>
                     <element signature="e#4742#4743#0" expanded="true" />
                     <element signature="e#4767#4768#0" expanded="true" />
@@ -116,10 +112,10 @@
                     <element signature="e#4874#4875#0" expanded="true" />
                     <element signature="e#4961#4962#0" expanded="true" />
                     <element signature="e#5015#5016#0" expanded="true" />
-                    <element signature="e#6059#7096#0" expanded="false" />
-                    <element signature="e#9071#13972#0" expanded="false" />
-                    <element signature="e#15471#17838#0" expanded="false" />
-                    <element signature="e#20527#21124#0" expanded="false" />
+                    <element signature="e#5678#6715#0" expanded="false" />
+                    <element signature="e#8690#13591#0" expanded="false" />
+                    <element signature="e#15090#17457#0" expanded="false" />
+                    <element signature="e#20146#20743#0" expanded="false" />
                   </folding>
                 </state>
               </provider>
@@ -128,7 +124,7 @@
           <file leaf-file-name="shader_builder.rs" pinned="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/src/shader_builder.rs">
               <provider selected="true" editor-type-id="text-editor">
-                <state relative-caret-position="0">
+                <state relative-caret-position="-60">
                   <caret line="316" column="44" lean-forward="true" selection-start-line="316" selection-start-column="44" selection-end-line="316" selection-end-column="44" />
                   <folding />
                 </state>
@@ -222,8 +218,8 @@
         <option value="$PROJECT_DIR$/src/preview.rs" />
         <option value="$PROJECT_DIR$/src/shader_builder.rs" />
         <option value="$PROJECT_DIR$/src/main.rs" />
-        <option value="$PROJECT_DIR$/src/network.rs" />
         <option value="$PROJECT_DIR$/src/operator.rs" />
+        <option value="$PROJECT_DIR$/src/network.rs" />
       </list>
     </option>
   </component>
@@ -705,7 +701,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/interaction.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="440">
+        <state relative-caret-position="1340">
           <caret line="69" column="0" lean-forward="false" selection-start-line="69" selection-start-column="0" selection-end-line="69" selection-end-column="0" />
           <folding>
             <element signature="e#1897#1898#0" expanded="true" />
@@ -738,63 +734,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/network.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="380">
-          <caret line="200" column="35" lean-forward="false" selection-start-line="200" selection-start-column="35" selection-end-line="200" selection-end-column="35" />
-          <folding>
-            <element signature="e#4742#4743#0" expanded="true" />
-            <element signature="e#4767#4768#0" expanded="true" />
-            <element signature="e#4840#4841#0" expanded="true" />
-            <element signature="e#4874#4875#0" expanded="true" />
-            <element signature="e#4961#4962#0" expanded="true" />
-            <element signature="e#5015#5016#0" expanded="true" />
-            <element signature="e#6059#7096#0" expanded="false" />
-            <element signature="e#9071#13972#0" expanded="false" />
-            <element signature="e#15471#17838#0" expanded="false" />
-            <element signature="e#20527#21124#0" expanded="false" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/shader_builder.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="316" column="44" lean-forward="true" selection-start-line="316" selection-start-column="44" selection-end-line="316" selection-end-column="44" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/operator.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="440">
-          <caret line="75" column="17" lean-forward="false" selection-start-line="75" selection-start-column="16" selection-end-line="75" selection-end-column="17" />
-          <folding>
-            <element signature="e#5983#5984#0" expanded="true" />
-            <element signature="e#6027#6028#0" expanded="true" />
-            <element signature="e#12849#12850#0" expanded="true" />
-            <element signature="e#12888#12889#0" expanded="true" />
-            <element signature="e#12925#12926#0" expanded="true" />
-            <element signature="e#12965#12966#0" expanded="true" />
-            <element signature="e#13152#13153#0" expanded="true" />
-            <element signature="e#13194#13195#0" expanded="true" />
-            <element signature="e#13226#13227#0" expanded="true" />
-            <element signature="e#13265#13266#0" expanded="true" />
-            <element signature="e#13300#13301#0" expanded="true" />
-            <element signature="e#13339#13340#0" expanded="true" />
-            <marker date="1519954246308" expanded="true" signature="12782:12788" ph="{...}" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-380">
-          <caret line="187" column="47" lean-forward="true" selection-start-line="187" selection-start-column="47" selection-end-line="187" selection-end-column="47" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/preview.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="320">
@@ -805,9 +744,66 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/texture.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1120">
-          <caret line="56" column="35" lean-forward="false" selection-start-line="56" selection-start-column="35" selection-end-line="56" selection-end-column="35" />
+        <state relative-caret-position="340">
+          <caret line="17" column="14" lean-forward="true" selection-start-line="17" selection-start-column="14" selection-end-line="17" selection-end-column="14" />
           <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/shader_builder.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-60">
+          <caret line="316" column="44" lean-forward="true" selection-start-line="316" selection-start-column="44" selection-end-line="316" selection-end-column="44" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/operator.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="260">
+          <caret line="58" column="5" lean-forward="false" selection-start-line="58" selection-start-column="5" selection-end-line="58" selection-end-column="5" />
+          <folding>
+            <element signature="e#5491#5492#0" expanded="true" />
+            <element signature="e#5535#5536#0" expanded="true" />
+            <element signature="e#12357#12358#0" expanded="true" />
+            <element signature="e#12396#12397#0" expanded="true" />
+            <element signature="e#12433#12434#0" expanded="true" />
+            <element signature="e#12473#12474#0" expanded="true" />
+            <element signature="e#12660#12661#0" expanded="true" />
+            <element signature="e#12702#12703#0" expanded="true" />
+            <element signature="e#12734#12735#0" expanded="true" />
+            <element signature="e#12773#12774#0" expanded="true" />
+            <element signature="e#12808#12809#0" expanded="true" />
+            <element signature="e#12847#12848#0" expanded="true" />
+            <marker date="1519958793482" expanded="true" signature="12290:12296" ph="{...}" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="220">
+          <caret line="218" column="68" lean-forward="false" selection-start-line="218" selection-start-column="68" selection-end-line="218" selection-end-column="68" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/network.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="140">
+          <caret line="188" column="43" lean-forward="false" selection-start-line="188" selection-start-column="43" selection-end-line="188" selection-end-column="43" />
+          <folding>
+            <element signature="e#4742#4743#0" expanded="true" />
+            <element signature="e#4767#4768#0" expanded="true" />
+            <element signature="e#4840#4841#0" expanded="true" />
+            <element signature="e#4874#4875#0" expanded="true" />
+            <element signature="e#4961#4962#0" expanded="true" />
+            <element signature="e#5015#5016#0" expanded="true" />
+            <element signature="e#5678#6715#0" expanded="false" />
+            <element signature="e#8690#13591#0" expanded="false" />
+            <element signature="e#15090#17457#0" expanded="false" />
+            <element signature="e#20146#20743#0" expanded="false" />
+          </folding>
         </state>
       </provider>
     </entry>

@@ -188,19 +188,7 @@ impl Network {
 
     /// Scales the distance field represented by the currently
     /// selected op (if one exists).
-    pub fn scale_selected(&mut self, val: f32) {
-        if let Some(selected) = self.selection {
-            let node = self.graph.nodes.get_mut(selected).unwrap();
-
-            if let Some(ref mut params) = node.data.family.get_params_mut() {
-                params.data.w += val;
-            }
-        }
-    }
-
-    /// Translates the distance field represented by the currently
-    /// selected op (if one exists).
-    pub fn translate_selected(&mut self, val: &Vector3<f32>) {
+    pub fn increment_param(&mut self, val: &Vector4<f32>) {
         if let Some(selected) = self.selection {
             let node = self.graph.nodes.get_mut(selected).unwrap();
 
@@ -208,6 +196,7 @@ impl Network {
                 params.data.x += val.x;
                 params.data.y += val.y;
                 params.data.z += val.z;
+                params.data.w += val.w;
             }
         }
     }

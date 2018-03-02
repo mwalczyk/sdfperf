@@ -57,26 +57,6 @@ impl Parameters {
             step,
         }
     }
-
-    pub fn step_x(&mut self) {
-        self.data += self.step;
-        self.data.x.min(self.max.x).max(self.min.x);
-    }
-
-    pub fn step_x(&mut self) {
-        self.data += self.step;
-        self.data.x.min(self.max.x).max(self.min.x);
-    }
-
-    pub fn step_x(&mut self) {
-        self.data += self.step;
-        self.data.x.min(self.max.x).max(self.min.x);
-    }
-
-    pub fn step_x(&mut self) {
-        self.data += self.step;
-        self.data.x.min(self.max.x).max(self.min.x);
-    }
 }
 
 #[derive(Copy, Clone, PartialEq)]
