@@ -14,11 +14,27 @@ pub struct Node<T: Connected> {
     pub data: T,
 }
 
+impl<T: Connected> Node<T> {
+    fn new(data: T) -> Node<T> {
+        Node { data }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct Edges<T> {
     pub inputs: Vec<usize>,
     pub outputs: Vec<usize>,
     pub data: T,
+}
+
+impl<T> Edges<T> {
+    fn new(data: T) -> Edges<T> {
+        Edges {
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            data
+        }
+    }
 }
 
 pub struct Graph<N: Connected, E> {
@@ -38,30 +54,33 @@ impl<N: Connected, E> Graph<N, E> {
         }
     }
 
+    /// Returns an immutable reference to the node at `index`.
     pub fn get_node(&self, index: usize) -> Option<&Node<N>> {
         self.nodes.get(index)
     }
 
+    /// Returns a mutable reference to the node at `index`.
     pub fn get_node_mut(&mut self, index: usize) -> Option<&mut Node<N>> {
         self.nodes.get_mut(index)
     }
 
+    /// Returns an immutable reference to the graph's list of nodes.
     pub fn get_nodes(&self) -> &Vec<Node<N>> {
         &self.nodes
     }
+
+    /// Returns a mutable reference to the graph's list of nodes.
+    pub fn get_nodes_mut(&mut self) -> &mut Vec<Node<N>> { &mut self.nodes }
 
     pub fn get_edges(&self) -> &Vec<Edges<E>> {
         &self.edges
     }
 
-    pub fn add_node(&mut self, data_n: N, data_e: E) {
-        self.nodes.push(Node { data: data_n });
+    pub fn get_edges_mut(&mut self) -> &mut Vec<Edges<E>> { &mut self.edges }
 
-        self.edges.push(Edges {
-            inputs: Vec::new(),
-            outputs: Vec::new(),
-            data: data_e,
-        });
+    pub fn add_node(&mut self, data_n: N, data_e: E) {
+        self.nodes.push(Node::new(data_n));
+        self.edges.push(Edges::new(data_e));
     }
 
     pub fn remove_node(&mut self, i: usize) {

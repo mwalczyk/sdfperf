@@ -29,14 +29,9 @@ impl ShaderBuilder {
         uniform uint u_shading;
         uniform float u_time;
 
-        // The SSBO that will contain a transform for each op in the
-        // graph. Note that according to the spec, there can only be
-        // one array of variable size per SSBO, which is why we use
-        // the convenience struct `transform` above.
-        //
-        // Here, we pack each transform into a single `vec4` where
-        // the xyz components represent a translation and the w
-        // component represents a uniform scale.
+        // The SSBO that will contain a parameter vector for each op in
+        // the graph. Note that according to the spec, there can only be
+        // one array of variable size per SSBO.
         layout (std430, binding = 0) buffer params_block
         {
             vec4 params[];
@@ -73,6 +68,15 @@ impl ShaderBuilder {
             float s = sin(t * p.y);
             mat2  m = mat2(c, -s, s, c);
             vec3  q = vec3(m * p.xz, p.y);
+            return q;
+        }
+
+        vec3 domain_bend(in vec3 p, float t)
+        {
+            float c = cos(t * p.y);
+            float s = sin(t * p.y);
+            mat2 m = mat2(c, -s, s, c);
+            vec3 q = vec3(m * p.xy, p.z);
             return q;
         }
 

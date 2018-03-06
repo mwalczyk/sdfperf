@@ -28,10 +28,6 @@ pub enum ConnectionType {
     Invalid,
 }
 
-/// A struct representing a transformation that will be
-/// applied to a distance field. Here, the xyz coordinates
-/// of `data` represent a translation and the w-coordinate
-/// represents a uniform scale.
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameters {
     pub data: Vector4<f32>,
@@ -76,7 +72,7 @@ pub enum DomainType {
     Root,
     Transform,
     Twist,
-    //Bend
+    Bend
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -127,6 +123,7 @@ impl OpFamily {
                 DomainType::Root => "root",
                 DomainType::Transform => "transform",
                 DomainType::Twist => "twist",
+                DomainType::Bend => "bend"
             },
             OpFamily::Primitive(primitive) => match primitive {
                 PrimitiveType::Sphere => "sphere",
@@ -142,6 +139,8 @@ impl OpFamily {
         }
     }
 
+    /// Returns an enum that describes the connectivity of this op family
+    /// (whether it accepts inputs, outputs, or both).
     pub fn get_connectivity(&self) -> Connectivity {
         match *self {
             OpFamily::Domain(domain) => match domain {
@@ -193,6 +192,9 @@ impl OpFamily {
         }
     }
 
+
+    /// Returns a formattable string of shader code that corresponds to
+    /// this op family.
     pub fn get_code_template(&self) -> String {
         match *self {
             OpFamily::Domain(domain) => match domain {
@@ -208,6 +210,10 @@ impl OpFamily {
                 DomainType::Twist => "
                     float s_NAME = s_INPUT_A;
                     vec3 p_NAME = domain_twist(p_INPUT_A, params[INDEX].x);"
+                    .to_string(),
+                DomainType::Bend => "
+                    float s_NAME = s_INPUT_A;
+                    vec3 p_NAME = domain_bend(p_INPUT_A, params[INDEX].x);"
                     .to_string(),
             },
             OpFamily::Primitive(primitive) => match primitive {
@@ -238,6 +244,8 @@ impl OpFamily {
         }
     }
 
+    /// Returns `true` if this op family can connect to `other`, either
+    /// directly or indir
     pub fn can_connect_to(&self, other: OpFamily) -> bool {
         match *self {
             // This operator is a domain operator.
@@ -259,6 +267,8 @@ impl OpFamily {
         }
     }
 
+    /// Returns the connection type between this op family and `other`. A
+    /// connection can be either direct, indirect, or invalid.
     pub fn get_connection_type(&self, other: OpFamily) -> ConnectionType {
         match *self {
             // This operator is a domain operator.
@@ -274,6 +284,7 @@ impl OpFamily {
         }
     }
 
+    /// Returns the default parameters for this op family.
     pub fn get_default_params(&self) -> Parameters {
         match *self {
             OpFamily::Domain(domain) => match domain {
@@ -290,6 +301,13 @@ impl OpFamily {
                     Vector4::new(0.0, 0.0, 0.0, 0.0),
                     Vector4::new(20.0, 20.0, 0.0, 0.0),
                     Vector4::new(1.0, 1.0, 0.0, 0.0),
+                ),
+                DomainType::Bend => Parameters::new(
+                    Vector4::new(0.5, 0.5, 0.0, 0.0),
+                    0,
+                    Vector4::new(0.0, 0.0, 0.0, 0.0),
+                    Vector4::new(2.0, 2.0, 0.0, 0.0),
+                    Vector4::new(0.05, 0.05, 0.0, 0.0),
                 ),
                 _ => Parameters::default(),
             },

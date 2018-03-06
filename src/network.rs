@@ -103,10 +103,10 @@ pub struct Network {
     pub grid: Grid,
 
     /// The index of the currently selected op (if there is one)
-    pub selection: Option<usize>,
+    pub selection_id: Option<usize>,
 
-    /// The index of the root op (if there is one)
-    pub root: Option<usize>,
+    /// The index of the render op (if there is one)
+    pub render_id: Option<usize>,
 
     /// A flag that controls whether or not the shader graph
     /// needs to be rebuilt
@@ -158,8 +158,8 @@ impl Network {
             renderer: Renderer::new(size),
             preview: Preview::new(),
             grid: Grid::new(size, Vector2::new(20, 20)),
-            selection: None,
-            root: None,
+            selection_id: None,
+            render_id: None,
             dirty: false,
             show_preview: true,
             snapping: true,
@@ -189,7 +189,7 @@ impl Network {
     /// Scales the distance field represented by the currently
     /// selected op (if one exists).
     pub fn increment_param(&mut self, val: &Vector4<f32>) {
-        if let Some(selected) = self.selection {
+        if let Some(selected) = self.selection_id {
             let node = self.graph.nodes.get_mut(selected).unwrap();
 
             let params = node.data.get_params_mut();
@@ -202,31 +202,31 @@ impl Network {
 
     /// Deletes the currently selected op (if the selection is not empty).
     pub fn delete_selected(&mut self) {
-        if let Some(selected) = self.selection {
+        if let Some(selected) = self.selection_id {
             // Before removing this vertex from the graph,
             // check to see if it was connected to the root
             // (if one exists). If so, then the shader
             // graph needs to be rebuilt.
-            if let Some(root) = self.root {
+            if let Some(id) = self.render_id {
                 for edge in self.graph.edges[selected].outputs.iter() {
-                    if *edge == root {
+                    if *edge == id {
                         self.dirty = true;
-                        self.root = None;
+                        self.render_id = None;
                         break;
                     }
                 }
             }
 
             // The last node in the graph's list of nodes
-            // will be moved, so its transform index needs
+            // will be moved, so its parameter index needs
             // to be reset.
             if let Some(node) = self.graph.nodes.last_mut() {
-                //TODO node.data.transform.index = selected;
+                node.data.params.index = selected;
             }
 
             // Finally, remove the node and reset the selection.
             self.graph.remove_node(selected);
-            self.selection = None;
+            self.selection_id = None;
         }
     }
 
@@ -253,7 +253,7 @@ impl Network {
         if let Pair::Both(node_a, node_b) = index_twice(&mut self.graph.nodes, a, b) {
             // If we previously connected to a render op, then we
             // know that the graph must be rebuilt.
-            if let Some(_) = self.root {
+            if let Some(_) = self.render_id {
                 self.dirty = true;
                 println!("Active render node in-line: re-building graph");
             }
@@ -261,7 +261,7 @@ impl Network {
             // If we are connecting to a render op, then the shader
             // must be rebuilt.
             if let OpFamily::Primitive(PrimitiveType::Render) = node_b.data.family {
-                self.root = Some(b);
+                self.render_id = Some(b);
                 self.dirty = true;
                 println!("Connected to render node: building graph");
             }
@@ -300,7 +300,7 @@ impl Network {
             // Is the mouse inside of this op's bounding box?
             if node.data.bounds_body.inside(&mouse.curr) {
                 // Is there an op currently selected?
-                if let Some(selected) = self.selection {
+                if let Some(selected) = self.selection_id {
                     // Is this op the selected op?
                     if selected == index {
                         // Is the mouse down?
@@ -333,7 +333,7 @@ impl Network {
                         node.data.state = InteractionState::Selected;
 
                         // Store the selected UUID.
-                        self.selection = Some(index);
+                        self.selection_id = Some(index);
                     }
                 } else {
                     // Otherwise, the mouse is still inside the bounds of this op,
@@ -344,14 +344,14 @@ impl Network {
             // The mouse is not inside of this op's bounding box.
             } else {
                 // Is there an op currently selected?
-                if let Some(selected) = self.selection {
+                if let Some(selected) = self.selection_id {
                     // Is this op the selected op?
                     if selected == index {
                         // Is the mouse down?
                         if mouse.ldown {
                             // The user has clicked somewhere else in the
                             // network, so reset the selection.
-                            self.selection = None;
+                            self.selection_id = None;
                         } else {
                             // Keep this op selected.
                             node.data.state = InteractionState::Selected;
@@ -420,7 +420,7 @@ impl Network {
                 PrimitiveType::Union
                 | PrimitiveType::Subtraction
                 | PrimitiveType::Intersection
-                | PrimitiveType::SmoothMinimum => Color::from_hex(0xA8B6C5, 1.0),
+                | PrimitiveType::SmoothMinimum => Color::from_hex(0xB695C6, 1.0),
                 PrimitiveType::Render => Color::from_hex(0xC77832, 1.0),
             },
         };
@@ -547,6 +547,7 @@ impl Network {
                 let dst_centroid = dst_node.data.bounds_input.centroid();
 
                 match src_family.get_connection_type(dst_family) {
+                    // Draw a bezier curve between these two operators.
                     ConnectionType::Direct => {
                         let a = src_centroid;
                         let d = dst_centroid;
@@ -556,6 +557,8 @@ impl Network {
                         let c = Vector2::new(mid.x, d.y);
                         self.curve_between(a, b, c, d);
                     }
+                    // Draw a straight, dashed line (export) between these
+                    // two operators.
                     ConnectionType::Indirect => {
                         self.line_between(src_centroid, dst_centroid);
                     }
@@ -569,6 +572,7 @@ impl Network {
     /// Draws a grid in the network editor.
     fn draw_grid(&mut self) {
         let draw_color = Color::from_hex(0x373737, 0.25);
+
         self.renderer.draw(
             DrawParams::Line(
                 &self.grid.points_vertical,
@@ -579,6 +583,7 @@ impl Network {
             None,
             None,
         );
+
         self.renderer.draw(
             DrawParams::Line(
                 &self.grid.points_horizontal,
@@ -598,7 +603,7 @@ impl Network {
             all_params.push(node.data.params.data);
         }
 
-        self.preview.update_transforms(all_params);
+        self.preview.update_params(all_params);
     }
 
     /// Loads all texture assets.

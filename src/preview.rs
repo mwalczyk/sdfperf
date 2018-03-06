@@ -13,9 +13,16 @@ use std::os::raw::c_void;
 
 #[derive(Copy, Clone)]
 pub enum Shading {
+    /// Display the z-depth of each fragment
     Depth,
+
+    /// Display the number of steps taken along the ray
     Steps,
+
+    /// Display the scene with ambient occlusion
     AmbientOcclusion,
+
+    /// Display the normals of the underlying distance field
     Normals,
 }
 
@@ -57,7 +64,7 @@ impl VirtualCamera {
         self.yaw = -90.0;
     }
 
-    fn rebuild_front(&mut self) {
+    fn rebuild_basis(&mut self) {
         self.front = Vector3::new(
             self.yaw.to_radians().cos() * self.pitch.to_radians().cos(),
             self.pitch.to_radians().sin(),
@@ -69,16 +76,24 @@ impl VirtualCamera {
 }
 
 pub struct Preview {
+    /// The valid shader program, if one exists
     program_valid: Option<Program>,
 
+    /// The fallback program that will be used if `program_valid`
+    /// is `None`
     program_error: Program,
 
+    /// The bounding box of the preview window
     bounds: Rect,
 
+    /// The virtual camera that will be used to view the scene
     camera: VirtualCamera,
 
+    /// The current shading mode that will be applied to the scene
     shading: Shading,
 
+    /// The OpenGL handle to the shader storage buffer object (SSBO)
+    /// that will hold all of the op parameters
     ssbo: GLuint,
 }
 
@@ -149,14 +164,16 @@ impl Preview {
         self.program_valid = program;
     }
 
-    pub fn update_transforms(&self, data: Vec<Vector4<f32>>) {
+    /// Writes `data` to the OpenGL buffer that this preview
+    /// will use to populate shader parameters during rendering.
+    pub fn update_params(&self, data: Vec<Vector4<f32>>) {
         unsafe {
             let data_size = (data.len() * mem::size_of::<Vector4<f32>>()) as GLsizeiptr;
             gl::NamedBufferSubData(self.ssbo, 0, data_size, data.as_ptr() as *const c_void);
         }
     }
 
-    /// Sets the SDF shading mode.
+    /// Sets the shading mode.
     pub fn set_shading(&mut self, shading: Shading) {
         self.shading = shading;
     }
@@ -198,7 +215,7 @@ impl Preview {
                 self.camera.yaw += offset.x * ROTATION_SENSITIVITY;
                 self.camera.pitch += offset.y * ROTATION_SENSITIVITY;
                 self.camera.pitch.min(89.0).max(-89.0);
-                self.camera.rebuild_front();
+                self.camera.rebuild_basis();
             }
 
             // Handle camera translation.

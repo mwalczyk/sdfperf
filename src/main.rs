@@ -169,6 +169,9 @@ fn main() {
                                         glutin::VirtualKeyCode::Key3 => {
                                             OpFamily::Domain(DomainType::Twist)
                                         }
+                                        glutin::VirtualKeyCode::Key4 => {
+                                            OpFamily::Domain(DomainType::Bend)
+                                        }
                                         _ => OpFamily::Primitive(PrimitiveType::Sphere),
                                     };
                                     network.add_op(
@@ -261,7 +264,7 @@ fn main() {
 
         // Check to see if the graph needs to be rebuilt.
         if network.dirty() {
-            if let Some(root) = network.root {
+            if let Some(root) = network.render_id {
                 let indices = network.graph.traverse(root);
                 let program = builder.build_sources(&network, indices);
                 network.preview.set_valid_program(program);

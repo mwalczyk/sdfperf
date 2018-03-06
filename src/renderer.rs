@@ -64,6 +64,7 @@ impl Renderer {
     pub fn new(size: Vector2<f32>) -> Renderer {
         static VERTEX_DATA: [GLfloat; 24] = [
             // Positions followed by texture coordinates.
+
             // First triangle
             0.0, 0.0,   0.0, 1.0, // UL
             1.0, 0.0,   1.0, 1.0, // UR
