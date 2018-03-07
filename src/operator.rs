@@ -1,6 +1,7 @@
 use bounds::{Edge, Rect};
 use graph::Connected;
 use interaction::InteractionState;
+use renderer::{DrawParams, Drawable};
 
 use cgmath::{Vector2, Vector3, Vector4, Zero};
 use uuid::Uuid;
@@ -30,10 +31,21 @@ pub enum ConnectionType {
 
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameters {
+    /// The actual parameter data
     pub data: Vector4<f32>,
+
+    /// The index of this parameter in the SSBO that will hold
+    /// all of the op parameters at runtime
     pub index: usize,
+
+    /// The minimum value of each component of this parameter
     pub min: Vector4<f32>,
+
+    /// The maximum value of each component of this parameter
     pub max: Vector4<f32>,
+
+    /// The step size that will be taken when a component of
+    /// this parameter is incremented or decremented
     pub step: Vector4<f32>,
 }
 
@@ -108,11 +120,10 @@ pub enum DisplacementType {
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum OpFamily {
-    //Data,
-    //Displacement,
+    // TODO: Data,
+    // TODO: Displacement,
     Domain(DomainType),
     Primitive(PrimitiveType),
-    // INPUT_A += noise(p_INPUT_A);
 }
 
 impl OpFamily {
@@ -245,7 +256,7 @@ impl OpFamily {
     }
 
     /// Returns `true` if this op family can connect to `other`, either
-    /// directly or indir
+    /// directly or indirectly.
     pub fn can_connect_to(&self, other: OpFamily) -> bool {
         match *self {
             // This operator is a domain operator.
@@ -447,5 +458,11 @@ impl Connected for Op {
 
     fn on_disconnect(&mut self) {
         self.active_inputs -= 1;
+    }
+}
+
+impl<'a> Drawable<'a> for Op {
+    fn get_draw_params(&'a self) -> DrawParams<'a> {
+        DrawParams::Rectangle(&self.bounds_body)
     }
 }

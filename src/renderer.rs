@@ -30,6 +30,10 @@ pub enum DrawParams<'a> {
     Line(&'a Vec<f32>, LineMode, LineConnectivity),
 }
 
+pub trait Drawable<'a> {
+    fn get_draw_params(&'a self) -> DrawParams<'a>;
+}
+
 pub struct Renderer {
     /// The shader program that will be used to draw sprites
     program_draw: Program,
