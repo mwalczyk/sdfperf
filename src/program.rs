@@ -7,19 +7,24 @@ use cgmath::{Array, Matrix, Matrix4, Vector2, Vector3, Vector4};
 use std::ptr;
 use std::str;
 use std::ffi::CString;
+use std::collections::HashMap;
 
-pub struct UniformEntry {
-    name: String,
-    location: GLint,
+pub struct Uniform {
+    location: i32,
+    size: i32,
+    // TODO this should be converted to a new type, like: https://github.com/glium/glium/blob/master/src/uniforms/value.rs
+    ty: GLenum,
 }
 
 pub struct Program {
     pub id: GLuint,
     vs_src: String,
     fs_src: String,
+    uniforms: HashMap<String, Uniform>
 }
 
 impl Program {
+
     /// Compiles a shader of type `stage` from the source held in `src`.
     fn compile_shader(src: &String, stage: GLenum) -> Result<GLuint, String> {
         let shader;
@@ -100,7 +105,49 @@ impl Program {
         }
     }
 
-    fn perform_reflection(src: &str) {}
+    fn perform_reflection(&mut self) {
+        unsafe {
+            use std::mem;
+
+            // Retrieve the number of active uniforms.
+            let mut active_uniforms: GLint = mem::uninitialized();
+            gl::GetProgramiv(self.id, gl::ACTIVE_UNIFORMS, &mut active_uniforms);
+
+            // Retrieve the maximum length of each uniform name.
+            let mut max_name_length: GLint = 0;
+            gl::GetProgramiv(self.id, gl::ACTIVE_UNIFORM_MAX_LENGTH, &mut max_name_length);
+
+            // Query for information about each uniform entry.
+            for i in 0..active_uniforms {
+
+                let mut name_bytes = Vec::with_capacity(max_name_length as usize);
+                let mut name_length = 0;
+                let mut size = 0;
+                let mut ty = gl::NONE;
+
+                gl::GetActiveUniform(
+                    self.id,
+                    i as GLuint,
+                    max_name_length,
+                    &mut name_length,
+                    &mut size,
+                    &mut ty,
+                    name_bytes.as_mut_ptr() as *mut GLchar,
+                );
+
+                // Convert the byte array to a string.
+                name_bytes.set_len(name_length as usize);
+                let name = String::from_utf8(name_bytes).unwrap();
+
+                // Finally, get the uniform's location.
+                let location = gl::GetUniformLocation(self.id, CString::new(name.clone()).unwrap().as_ptr());
+
+                println!("Uniform Entry with name {:?}: size {}, type {}, location {}", name, size, ty, location);
+                self.uniforms.insert(name, Uniform{ location, size, ty});
+            }
+
+        }
+    }
 
     pub fn new(vs_src: String, fs_src: String) -> Option<Program> {
         // Make sure that compiling each of the shaders was successful.
@@ -112,7 +159,10 @@ impl Program {
                 // Make sure that linking the shader program was successful.
                 if let Ok(id) = Program::link_program(vs_id, fs_id) {
                     // If everything went ok, return the shader program.
-                    return Some(Program { id, vs_src, fs_src });
+                    let mut valid_program = Program { id, vs_src, fs_src, uniforms: HashMap::new() };
+                    valid_program.perform_reflection();
+
+                    return Some(valid_program);
                 } else {
                     return None;
                 }
@@ -155,10 +205,52 @@ impl Program {
         }
     }
 
+    pub fn uniform_2i(&self, name: &str, value: &cgmath::Vector2<i32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform2iv(self.id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn uniform_3i(&self, name: &str, value: &cgmath::Vector3<i32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform3iv(self.id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn uniform_4i(&self, name: &str, value: &cgmath::Vector4<i32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform4iv(self.id, location, 1, value.as_ptr());
+        }
+    }
+
     pub fn uniform_1ui(&self, name: &str, value: u32) {
         unsafe {
             let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniform1ui(self.id, location, value as gl::types::GLuint);
+        }
+    }
+
+    pub fn uniform_2ui(&self, name: &str, value: &cgmath::Vector2<u32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform2uiv(self.id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn uniform_3ui(&self, name: &str, value: &cgmath::Vector3<u32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform3uiv(self.id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn uniform_4ui(&self, name: &str, value: &cgmath::Vector4<u32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniform4uiv(self.id, location, 1, value.as_ptr());
         }
     }
 
@@ -187,6 +279,13 @@ impl Program {
         unsafe {
             let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
             gl::ProgramUniform4fv(self.id, location, 1, value.as_ptr());
+        }
+    }
+
+    pub fn uniform_matrix_3f(&self, name: &str, value: &cgmath::Matrix3<f32>) {
+        unsafe {
+            let location = gl::GetUniformLocation(self.id, CString::new(name).unwrap().as_ptr());
+            gl::ProgramUniformMatrix3fv(self.id, location, 1, gl::FALSE, value.as_ptr());
         }
     }
 

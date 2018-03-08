@@ -84,7 +84,7 @@ pub enum DomainType {
     Root,
     Transform,
     Twist,
-    Bend
+    Bend,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -134,7 +134,7 @@ impl OpFamily {
                 DomainType::Root => "root",
                 DomainType::Transform => "transform",
                 DomainType::Twist => "twist",
-                DomainType::Bend => "bend"
+                DomainType::Bend => "bend",
             },
             OpFamily::Primitive(primitive) => match primitive {
                 PrimitiveType::Sphere => "sphere",
@@ -202,7 +202,6 @@ impl OpFamily {
             },
         }
     }
-
 
     /// Returns a formattable string of shader code that corresponds to
     /// this op family.
