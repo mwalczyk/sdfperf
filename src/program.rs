@@ -20,11 +20,10 @@ pub struct Program {
     pub id: GLuint,
     vs_src: String,
     fs_src: String,
-    uniforms: HashMap<String, Uniform>
+    uniforms: HashMap<String, Uniform>,
 }
 
 impl Program {
-
     /// Compiles a shader of type `stage` from the source held in `src`.
     fn compile_shader(src: &String, stage: GLenum) -> Result<GLuint, String> {
         let shader;
@@ -119,7 +118,6 @@ impl Program {
 
             // Query for information about each uniform entry.
             for i in 0..active_uniforms {
-
                 let mut name_bytes = Vec::with_capacity(max_name_length as usize);
                 let mut name_length = 0;
                 let mut size = 0;
@@ -140,12 +138,15 @@ impl Program {
                 let name = String::from_utf8(name_bytes).unwrap();
 
                 // Finally, get the uniform's location.
-                let location = gl::GetUniformLocation(self.id, CString::new(name.clone()).unwrap().as_ptr());
+                let location =
+                    gl::GetUniformLocation(self.id, CString::new(name.clone()).unwrap().as_ptr());
 
-                println!("Uniform Entry with name {:?}: size {}, type {}, location {}", name, size, ty, location);
-                self.uniforms.insert(name, Uniform{ location, size, ty});
+                println!(
+                    "Uniform Entry with name {:?}: size {}, type {}, location {}",
+                    name, size, ty, location
+                );
+                self.uniforms.insert(name, Uniform { location, size, ty });
             }
-
         }
     }
 
@@ -159,7 +160,12 @@ impl Program {
                 // Make sure that linking the shader program was successful.
                 if let Ok(id) = Program::link_program(vs_id, fs_id) {
                     // If everything went ok, return the shader program.
-                    let mut valid_program = Program { id, vs_src, fs_src, uniforms: HashMap::new() };
+                    let mut valid_program = Program {
+                        id,
+                        vs_src,
+                        fs_src,
+                        uniforms: HashMap::new(),
+                    };
                     valid_program.perform_reflection();
 
                     return Some(valid_program);

@@ -166,9 +166,9 @@ impl Preview {
 
     /// Writes `data` to the OpenGL buffer that this preview
     /// will use to populate shader parameters during rendering.
-    pub fn update_params(&self, data: Vec<Vector4<f32>>) {
+    pub fn update_params(&self, data: Vec<f32>) {
         unsafe {
-            let data_size = (data.len() * mem::size_of::<Vector4<f32>>()) as GLsizeiptr;
+            let data_size = (data.len() * mem::size_of::<f32>()) as GLsizeiptr;
             gl::NamedBufferSubData(self.ssbo, 0, data_size, data.as_ptr() as *const c_void);
         }
     }

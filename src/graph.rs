@@ -22,8 +22,15 @@ impl<T: Connected> Node<T> {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Edges<T> {
+    /// The indices of any nodes that are inputs to the node backed by
+    /// this `Edges` instance
     pub inputs: Vec<usize>,
+
+    /// The indices of any nodes that are outputs from the node backed by
+    /// this `Edges` instance
     pub outputs: Vec<usize>,
+
+    /// The data associated with this edge
     pub data: T,
 }
 
@@ -37,8 +44,13 @@ impl<T> Edges<T> {
     }
 }
 
+/// A specialized directed acyclic graph (DAG) implementation that
+/// allows individual nodes to specify whether or not they can
+/// accept incoming or outgoing connections. For example, a particular
+/// "root" node might only have outgoing edges, while disallowing
+/// any incoming edges.
 pub struct Graph<N: Connected, E> {
-    /// The nodes (vertices) in the graph
+    /// The nodes in the graph
     pub nodes: Vec<Node<N>>,
 
     /// A list of `Edges` structs, where each `Edges` corresponds
@@ -74,48 +86,54 @@ impl<N: Connected, E> Graph<N, E> {
         &mut self.nodes
     }
 
+    /// Returns an immutable reference to the graph's list of edges.
     pub fn get_edges(&self) -> &Vec<Edges<E>> {
         &self.edges
     }
 
+    /// Returns a mutable reference to the graph's list of edges.
     pub fn get_edges_mut(&mut self) -> &mut Vec<Edges<E>> {
         &mut self.edges
     }
 
+    /// Adds a new node to the graph that owns `data_n` and whose
+    /// corresponding list of edges owns `data_e`.
     pub fn add_node(&mut self, data_n: N, data_e: E) {
         self.nodes.push(Node::new(data_n));
         self.edges.push(Edges::new(data_e));
     }
 
-    pub fn remove_node(&mut self, i: usize) {
+    /// Removes the node at `index` from the graph.
+    pub fn remove_node(&mut self, index: usize) {
         // The (original) index of the last node, which
         // will be swapped into the deleted node's place.
         let swapped_index = self.nodes.len() - 1;
 
-        let removed_vertex = self.nodes.swap_remove(i);
-        let removed_edges = self.edges.swap_remove(i);
+        let removed_node = self.nodes.swap_remove(index);
+        let removed_edges = self.edges.swap_remove(index);
 
         // Prune edges.
-        for (index, edges) in self.edges.iter_mut().enumerate() {
+        for (i, edges) in self.edges.iter_mut().enumerate() {
             // Delete edges that started at the removed node and
             // update the number of active inputs.
-            edges.inputs.retain(|&input| input != i);
+            edges.inputs.retain(|&input| input != index);
+
             let count = edges.inputs.len();
-            self.nodes[index].data.update_active_inputs_count(count);
+            self.nodes[i].data.update_active_inputs_count(count);
 
             // Delete edges that terminated at the removed node.
-            edges.outputs.retain(|&output| output != i);
+            edges.outputs.retain(|&output| output != index);
 
             // Update any edges that were pointing to or from the
             // swapped node.
-            for index in edges.inputs.iter_mut() {
-                if *index == swapped_index {
-                    *index = i;
+            for i in edges.inputs.iter_mut() {
+                if *i == swapped_index {
+                    *i = index;
                 }
             }
-            for index in edges.outputs.iter_mut() {
-                if *index == swapped_index {
-                    *index = i;
+            for i in edges.outputs.iter_mut() {
+                if *i == swapped_index {
+                    *i = index;
                 }
             }
         }

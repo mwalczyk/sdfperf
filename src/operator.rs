@@ -29,40 +29,65 @@ pub enum ConnectionType {
     Invalid,
 }
 
+const PARAMETER_CAPACITY: usize = 4;
+
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameters {
     /// The actual parameter data
-    pub data: Vector4<f32>,
+    pub data: [f32; PARAMETER_CAPACITY],
+
+    /// The names of each component of this parameter
+    pub names: [&'static str; PARAMETER_CAPACITY],
 
     /// The index of this parameter in the SSBO that will hold
     /// all of the op parameters at runtime
     pub index: usize,
 
-    /// The minimum value of each component of this parameter
-    pub min: Vector4<f32>,
+    /// The minimum value of each component of this parameter -
+    /// in other words, `data[0]` should always be greater than
+    /// or equal to `min[0]`
+    min: [f32; PARAMETER_CAPACITY],
 
-    /// The maximum value of each component of this parameter
-    pub max: Vector4<f32>,
+    /// The maximum value of each component of this parameter -
+    /// in other words, `data[0]` should always be less than
+    /// or equal to `max[0]`
+    max: [f32; PARAMETER_CAPACITY],
 
     /// The step size that will be taken when a component of
     /// this parameter is incremented or decremented
-    pub step: Vector4<f32>,
+    step: [f32; PARAMETER_CAPACITY],
 }
 
 impl Parameters {
     pub fn new(
-        data: Vector4<f32>,
+        data: [f32; PARAMETER_CAPACITY],
+        names: [&'static str; PARAMETER_CAPACITY],
         index: usize,
-        min: Vector4<f32>,
-        max: Vector4<f32>,
-        step: Vector4<f32>,
+        min: [f32; PARAMETER_CAPACITY],
+        max: [f32; PARAMETER_CAPACITY],
+        step: [f32; PARAMETER_CAPACITY],
     ) -> Parameters {
         Parameters {
             data,
+            names,
             index,
             min,
             max,
             step,
+        }
+    }
+
+    pub fn get(&self) -> &[f32; PARAMETER_CAPACITY] {
+        &self.data
+    }
+
+    pub fn get_mut(&mut self) -> &mut [f32; PARAMETER_CAPACITY] {
+        &mut self.data
+    }
+
+    pub fn set(&mut self, values: [f32; PARAMETER_CAPACITY]) {
+        for (i, v) in values.iter().enumerate() {
+            self.data[i] += v;
         }
     }
 }
@@ -70,11 +95,12 @@ impl Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Parameters::new(
-            Vector4::zero(),
+            [0.0; PARAMETER_CAPACITY],
+            ["param0", "param1", "param2", "param3"],
             0,
-            Vector4::zero(),
-            Vector4::zero(),
-            Vector4::zero(),
+            [0.0; PARAMETER_CAPACITY],
+            [0.0; PARAMETER_CAPACITY],
+            [0.0; PARAMETER_CAPACITY],
         )
     }
 }
@@ -299,35 +325,39 @@ impl OpFamily {
         match *self {
             OpFamily::Domain(domain) => match domain {
                 DomainType::Transform => Parameters::new(
-                    Vector4::new(0.0, 0.0, 0.0, 1.0),
+                    [0.0, 0.0, 0.0, 1.0],
+                    ["translate_x", "translate_y", "translate_z", "scale"],
                     0,
-                    Vector4::new(-10.0, -10.0, -10.0, 0.1),
-                    Vector4::new(10.0, 10.0, 10.0, 10.0),
-                    Vector4::new(0.5, 0.5, 0.5, 0.1),
+                    [-10.0, -10.0, -10.0, 0.1],
+                    [10.0, 10.0, 10.0, 10.0],
+                    [0.5, 0.5, 0.5, 0.1],
                 ),
                 DomainType::Twist => Parameters::new(
-                    Vector4::new(4.0, 4.0, 0.0, 0.0),
+                    [4.0, 4.0, 0.0, 0.0],
+                    ["twist_x", "twist_y", "", ""],
                     0,
-                    Vector4::new(0.0, 0.0, 0.0, 0.0),
-                    Vector4::new(20.0, 20.0, 0.0, 0.0),
-                    Vector4::new(1.0, 1.0, 0.0, 0.0),
+                    [0.0, 0.0, 0.0, 0.0],
+                    [20.0, 20.0, 0.0, 0.0],
+                    [1.0, 1.0, 0.0, 0.0],
                 ),
                 DomainType::Bend => Parameters::new(
-                    Vector4::new(0.5, 0.5, 0.0, 0.0),
+                    [0.5, 0.5, 0.0, 0.0],
+                    ["bend_x", "bend_y", "", ""],
                     0,
-                    Vector4::new(0.0, 0.0, 0.0, 0.0),
-                    Vector4::new(2.0, 2.0, 0.0, 0.0),
-                    Vector4::new(0.05, 0.05, 0.0, 0.0),
+                    [0.0, 0.0, 0.0, 0.0],
+                    [2.0, 2.0, 0.0, 0.0],
+                    [0.05, 0.05, 0.0, 0.0],
                 ),
                 _ => Parameters::default(),
             },
             OpFamily::Primitive(primitive) => match primitive {
                 PrimitiveType::SmoothMinimum => Parameters::new(
-                    Vector4::new(1.0, 0.0, 0.0, 0.0),
+                    [1.0, 0.0, 0.0, 0.0],
+                    ["exponent", "", "", ""],
                     0,
-                    Vector4::new(0.0, 0.0, 0.0, 0.0),
-                    Vector4::new(1.0, 0.0, 0.0, 0.0),
-                    Vector4::new(0.1, 0.0, 0.0, 0.0),
+                    [0.0, 0.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.1, 0.0, 0.0, 0.0],
                 ),
                 _ => Parameters::default(),
             },

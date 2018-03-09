@@ -193,10 +193,11 @@ impl Network {
             let node = self.graph.nodes.get_mut(selected).unwrap();
 
             let params = node.data.get_params_mut();
-            params.data.x += val.x;
-            params.data.y += val.y;
-            params.data.z += val.z;
-            params.data.w += val.w;
+            let data = params.get_mut();
+            data[0] += val.x;
+            data[1] += val.y;
+            data[2] += val.z;
+            data[3] += val.w;
         }
     }
 
@@ -232,7 +233,7 @@ impl Network {
 
     /// Adds a new op of type `family` to the network at coordinates
     /// `position` and dimensions `size`.
-    pub fn add_op(&mut self, mut family: OpFamily, position: Vector2<f32>, size: Vector2<f32>) {
+    pub fn add_op(&mut self, family: OpFamily, position: Vector2<f32>, size: Vector2<f32>) {
         // Create the operator.
         let mut op = Op::new(family, position, size);
 
@@ -600,7 +601,8 @@ impl Network {
     fn gather_params(&self) {
         let mut all_params = Vec::new();
         for node in self.graph.nodes.iter() {
-            all_params.push(node.data.params.data);
+            all_params.extend_from_slice(&node.data.params.data);
+            //all_params.push(node.data.params.data);
         }
 
         self.preview.update_params(all_params);
