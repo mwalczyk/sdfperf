@@ -34,14 +34,14 @@ const PARAMETER_CAPACITY: usize = 4;
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameters {
     /// The actual parameter data
-    pub data: [f32; PARAMETER_CAPACITY],
+    data: [f32; PARAMETER_CAPACITY],
 
     /// The names of each component of this parameter
-    pub names: [&'static str; PARAMETER_CAPACITY],
+    names: [&'static str; PARAMETER_CAPACITY],
 
     /// The index of this parameter in the SSBO that will hold
     /// all of the op parameters at runtime
-    pub index: usize,
+    index: usize,
 
     /// The minimum value of each component of this parameter -
     /// in other words, `data[0]` should always be greater than
@@ -77,18 +77,26 @@ impl Parameters {
         }
     }
 
-    pub fn get(&self) -> &[f32; PARAMETER_CAPACITY] {
+    pub fn get_data(&self) -> &[f32; PARAMETER_CAPACITY] {
         &self.data
     }
 
-    pub fn get_mut(&mut self) -> &mut [f32; PARAMETER_CAPACITY] {
+    pub fn get_data_mut(&mut self) -> &mut [f32; PARAMETER_CAPACITY] {
         &mut self.data
     }
 
-    pub fn set(&mut self, values: [f32; PARAMETER_CAPACITY]) {
+    pub fn get_index(&self) -> usize {
+        self.index
+    }
+
+    pub fn set_data(&mut self, values: [f32; PARAMETER_CAPACITY]) {
         for (i, v) in values.iter().enumerate() {
             self.data[i] += v;
         }
+    }
+
+    pub fn set_index(&mut self, index: usize) {
+        self.index = index;
     }
 }
 

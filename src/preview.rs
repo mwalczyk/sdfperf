@@ -24,6 +24,9 @@ pub enum Shading {
 
     /// Display the normals of the underlying distance field
     Normals,
+
+    /// Display the scene with diffuse lighting
+    Diffuse,
 }
 
 struct VirtualCamera {

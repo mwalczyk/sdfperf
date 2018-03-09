@@ -123,10 +123,6 @@ pub struct Network {
     /// A map of asset names to textures, used to render various
     /// UI elements
     assets: HashMap<String, Texture>,
-
-    /// A counter that is used to track the number of operators
-    /// in the current network that have parameters
-    params_index: usize,
 }
 
 enum Pair<T> {
@@ -164,7 +160,6 @@ impl Network {
             show_preview: true,
             snapping: true,
             assets: HashMap::new(),
-            params_index: 0,
         };
         network.load_assets();
         network
@@ -188,16 +183,16 @@ impl Network {
 
     /// Scales the distance field represented by the currently
     /// selected op (if one exists).
-    pub fn increment_param(&mut self, val: &Vector4<f32>) {
+    pub fn increment_param(&mut self, values: &Vector4<f32>) {
         if let Some(selected) = self.selection_id {
             let node = self.graph.nodes.get_mut(selected).unwrap();
 
             let params = node.data.get_params_mut();
-            let data = params.get_mut();
-            data[0] += val.x;
-            data[1] += val.y;
-            data[2] += val.z;
-            data[3] += val.w;
+            let data = params.get_data_mut();
+            data[0] += values.x;
+            data[1] += values.y;
+            data[2] += values.z;
+            data[3] += values.w;
         }
     }
 
@@ -222,7 +217,7 @@ impl Network {
             // will be moved, so its parameter index needs
             // to be reset.
             if let Some(node) = self.graph.nodes.last_mut() {
-                node.data.params.index = selected;
+                node.data.params.set_index(selected);
             }
 
             // Finally, remove the node and reset the selection.
@@ -240,8 +235,7 @@ impl Network {
         // We need to re-assign this op's parameter index so
         // that the resulting shader code properly indexes into
         // the SSBO of parameter data.
-        op.params.index = self.params_index;
-        self.params_index += 1;
+        op.params.set_index(self.graph.nodes.len());
 
         // Add the operator to the current graph.
         self.graph.add_node(op, 0);
@@ -412,7 +406,7 @@ impl Network {
     /// operator and the op type.
     fn color_for_op(&self, op: &Op) -> Color {
         let mut color = match op.family {
-            OpFamily::Domain(domain) => Color::from_hex(0x6F818E, 1.0),
+            OpFamily::Domain(domain) => Color::from_hex(0x515151, 1.0),
             OpFamily::Primitive(primitive) => match primitive {
                 PrimitiveType::Sphere
                 | PrimitiveType::Box
@@ -421,7 +415,7 @@ impl Network {
                 PrimitiveType::Union
                 | PrimitiveType::Subtraction
                 | PrimitiveType::Intersection
-                | PrimitiveType::SmoothMinimum => Color::from_hex(0xB695C6, 1.0),
+                | PrimitiveType::SmoothMinimum => Color::from_hex(0x8A7BA4, 1.0),
                 PrimitiveType::Render => Color::from_hex(0xC77832, 1.0),
             },
         };
@@ -495,10 +489,17 @@ impl Network {
         }
     }
 
-    fn curve_between(&self, a: Vector2<f32>, b: Vector2<f32>, c: Vector2<f32>, d: Vector2<f32>) {
+    /// Gathers the draw data required to draw a curve between
+    /// `a` and `b`.
+    fn curve_between(
+        &self,
+        a: &Vector2<f32>,
+        b: &Vector2<f32>,
+        c: &Vector2<f32>,
+        d: &Vector2<f32>,
+    ) {
         const LOD: usize = 20;
         let mut points = Vec::with_capacity(LOD * 4);
-
         for i in 0..LOD {
             let t = (i as f32) / (LOD as f32);
             let t_inv = 1.0 - t;
@@ -525,7 +526,9 @@ impl Network {
         );
     }
 
-    fn line_between(&self, a: Vector2<f32>, b: Vector2<f32>) {
+    /// Gathers the draw data required to draw a straight line between
+    /// `a` and `b`.
+    fn line_between(&self, a: &Vector2<f32>, b: &Vector2<f32>) {
         let points = vec![a.x, a.y, 0.0, 0.0, b.x, b.y, 1.0, 1.0];
 
         self.renderer.draw(
@@ -556,12 +559,12 @@ impl Network {
 
                         let b = Vector2::new(mid.x, a.y);
                         let c = Vector2::new(mid.x, d.y);
-                        self.curve_between(a, b, c, d);
+                        self.curve_between(&a, &b, &c, &d);
                     }
                     // Draw a straight, dashed line (export) between these
                     // two operators.
                     ConnectionType::Indirect => {
-                        self.line_between(src_centroid, dst_centroid);
+                        self.line_between(&src_centroid, &dst_centroid);
                     }
                     // An invalid connection - this should never happen, in practice.
                     _ => (),
@@ -601,7 +604,7 @@ impl Network {
     fn gather_params(&self) {
         let mut all_params = Vec::new();
         for node in self.graph.nodes.iter() {
-            all_params.extend_from_slice(&node.data.params.data);
+            all_params.extend_from_slice(node.data.params.get_data());
             //all_params.push(node.data.params.data);
         }
 

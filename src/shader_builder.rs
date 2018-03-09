@@ -194,6 +194,7 @@ impl ShaderBuilder {
         const uint SHADING_STEPS = 1;
         const uint SHADING_AMBIENT_OCCLUSION = 2;
         const uint SHADING_NORMALS = 3;
+        const uint SHADING_DIFFUSE = 4;
         vec3 shading(in ray r, in result res)
         {
             vec3 hit = r.o + r.d * res.total_distance;
@@ -226,14 +227,20 @@ impl ShaderBuilder {
                 vec3 n = calculate_normal(hit);
                 if (u_shading == SHADING_AMBIENT_OCCLUSION)
                 {
-                    const vec3 l = normalize(vec3(1.0, 5.0, 0.0));
-                    float d = max(0.0, dot(n, l));
                     float ao = ambient_occlusion(hit, n);
                     return vec3(pow(ao, 3.0));
                 }
-                else
+                else if (u_shading == SHADING_NORMALS)
                 {
                     return n * 0.5 + 0.5;
+                }
+                else
+                {
+                    const vec3 l = vec3(0.0, 2.0, 3.0);
+                    vec3 to_light = normalize(l - hit);
+                    float d = max(0.0, dot(n, to_light));
+                    float ao = ambient_occlusion(hit, n);
+                    return vec3(d * pow(ao, 3.0));
                 }
             }
         }

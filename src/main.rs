@@ -55,7 +55,7 @@ fn main() {
     let window = glutin::WindowBuilder::new()
         .with_dimensions(1200, 600)
         .with_title("signed-distance fields");
-    let context = glutin::ContextBuilder::new().with_multisampling(4);
+    let context = glutin::ContextBuilder::new().with_multisampling(8);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
     unsafe { gl_window.make_current() }.unwrap();
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
@@ -199,6 +199,9 @@ fn main() {
                                         }
                                         glutin::VirtualKeyCode::Key4 => {
                                             network.preview.set_shading(Shading::Normals)
+                                        }
+                                        glutin::VirtualKeyCode::Key5 => {
+                                            network.preview.set_shading(Shading::Diffuse)
                                         }
                                         glutin::VirtualKeyCode::Equals => {
                                             network.increment_param(&Vector4::new(
