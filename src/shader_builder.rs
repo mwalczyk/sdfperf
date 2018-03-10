@@ -37,7 +37,7 @@ impl ShaderBuilder {
             vec4 params[];
         };
 
-        const int MAX_STEPS = 256;
+        const uint MAX_STEPS = 256u;
         const float MAX_TRACE_DISTANCE = 64.0;
         const float MIN_HIT_DISTANCE = 0.001;
 
