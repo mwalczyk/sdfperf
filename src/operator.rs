@@ -1,4 +1,5 @@
 use bounds::{Edge, Rect};
+use constants;
 use graph::Connected;
 use interaction::InteractionState;
 use renderer::{DrawParams, Drawable};
@@ -29,15 +30,13 @@ pub enum ConnectionType {
     Invalid,
 }
 
-const PARAMETER_CAPACITY: usize = 4;
-
 #[derive(Copy, Clone, PartialEq)]
 pub struct Parameters {
     /// The actual parameter data
-    data: [f32; PARAMETER_CAPACITY],
+    data: [f32; constants::PARAMETER_CAPACITY],
 
     /// The names of each component of this parameter
-    names: [&'static str; PARAMETER_CAPACITY],
+    names: [&'static str; constants::PARAMETER_CAPACITY],
 
     /// The index of this parameter in the SSBO that will hold
     /// all of the op parameters at runtime
@@ -46,26 +45,26 @@ pub struct Parameters {
     /// The minimum value of each component of this parameter -
     /// in other words, `data[0]` should always be greater than
     /// or equal to `min[0]`
-    min: [f32; PARAMETER_CAPACITY],
+    min: [f32; constants::PARAMETER_CAPACITY],
 
     /// The maximum value of each component of this parameter -
     /// in other words, `data[0]` should always be less than
     /// or equal to `max[0]`
-    max: [f32; PARAMETER_CAPACITY],
+    max: [f32; constants::PARAMETER_CAPACITY],
 
     /// The step size that will be taken when a component of
     /// this parameter is incremented or decremented
-    step: [f32; PARAMETER_CAPACITY],
+    step: [f32; constants::PARAMETER_CAPACITY],
 }
 
 impl Parameters {
     pub fn new(
-        data: [f32; PARAMETER_CAPACITY],
-        names: [&'static str; PARAMETER_CAPACITY],
+        data: [f32; constants::PARAMETER_CAPACITY],
+        names: [&'static str; constants::PARAMETER_CAPACITY],
         index: usize,
-        min: [f32; PARAMETER_CAPACITY],
-        max: [f32; PARAMETER_CAPACITY],
-        step: [f32; PARAMETER_CAPACITY],
+        min: [f32; constants::PARAMETER_CAPACITY],
+        max: [f32; constants::PARAMETER_CAPACITY],
+        step: [f32; constants::PARAMETER_CAPACITY],
     ) -> Parameters {
         Parameters {
             data,
@@ -77,11 +76,11 @@ impl Parameters {
         }
     }
 
-    pub fn get_data(&self) -> &[f32; PARAMETER_CAPACITY] {
+    pub fn get_data(&self) -> &[f32; constants::PARAMETER_CAPACITY] {
         &self.data
     }
 
-    pub fn get_data_mut(&mut self) -> &mut [f32; PARAMETER_CAPACITY] {
+    pub fn get_data_mut(&mut self) -> &mut [f32; constants::PARAMETER_CAPACITY] {
         &mut self.data
     }
 
@@ -89,7 +88,7 @@ impl Parameters {
         self.index
     }
 
-    pub fn set_data(&mut self, values: [f32; PARAMETER_CAPACITY]) {
+    pub fn set_data(&mut self, values: [f32; constants::PARAMETER_CAPACITY]) {
         for (i, v) in values.iter().enumerate() {
             self.data[i] += v;
         }
@@ -103,12 +102,12 @@ impl Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Parameters::new(
-            [0.0; PARAMETER_CAPACITY],
+            [0.0; constants::PARAMETER_CAPACITY],
             ["param0", "param1", "param2", "param3"],
             0,
-            [0.0; PARAMETER_CAPACITY],
-            [0.0; PARAMETER_CAPACITY],
-            [0.0; PARAMETER_CAPACITY],
+            [0.0; constants::PARAMETER_CAPACITY],
+            [0.0; constants::PARAMETER_CAPACITY],
+            [0.0; constants::PARAMETER_CAPACITY],
         )
     }
 }
@@ -306,7 +305,16 @@ impl OpFamily {
             // This operator is a primitive operator.
             OpFamily::Primitive(primitive) => match other {
                 OpFamily::Domain(other_domain) => return false,
-                OpFamily::Primitive(other_primitive) => return true,
+                // Generators such as spheres, boxes, planes, and toruses can
+                // only be used as the source operator in primitive -> primitive
+                // interactions.
+                OpFamily::Primitive(other_primitive) => match other_primitive {
+                    PrimitiveType::Sphere
+                    | PrimitiveType::Box
+                    | PrimitiveType::Plane
+                    | PrimitiveType::Torus => return false,
+                    _ => return true,
+                },
             },
         }
     }

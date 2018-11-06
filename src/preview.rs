@@ -4,6 +4,7 @@ use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2,
 
 use bounds::Rect;
 use color::Color;
+use constants;
 use interaction::{MouseInfo, Panel};
 use program::Program;
 
@@ -141,7 +142,7 @@ impl Preview {
 
         let mut ssbo = 0;
         unsafe {
-            let ssbo_size = (256 * mem::size_of::<Vector4<f32>>()) as GLsizeiptr;
+            let ssbo_size = (constants::PARAMETER_SSBO_CAPACITY * mem::size_of::<Vector4<f32>>()) as GLsizeiptr;
 
             gl::CreateBuffers(1, &mut ssbo);
             gl::NamedBufferStorage(ssbo, ssbo_size, ptr::null(), gl::DYNAMIC_STORAGE_BIT);
@@ -149,7 +150,7 @@ impl Preview {
         Preview {
             program_valid: None,
             program_error,
-            bounds: Rect::new(Vector2::new(300.0, 000.0), Vector2::new(300.0, 300.0)),
+            bounds: Rect::new(Vector2::new(400.0, 50.0), constants::PREVIEW_RESOLUTION),
             camera: VirtualCamera::new(),
             shading: Shading::Normals,
             ssbo,
@@ -210,21 +211,19 @@ impl Preview {
     pub fn handle_interaction(&mut self, mouse: &MouseInfo) {
         if self.bounds.inside(&mouse.curr) {
             let offset = -mouse.velocity();
-            const ROTATION_SENSITIVITY: f32 = 0.25;
-            const TRANSLATION_SENSITIVITY: f32 = 0.01;
 
             // Handle camera rotation.
             if mouse.ldown {
-                self.camera.yaw += offset.x * ROTATION_SENSITIVITY;
-                self.camera.pitch += offset.y * ROTATION_SENSITIVITY;
+                self.camera.yaw += offset.x * constants::PREVIEW_ROTATION_SENSITIVITY;
+                self.camera.pitch += offset.y * constants::PREVIEW_ROTATION_SENSITIVITY;
                 self.camera.pitch.min(89.0).max(-89.0);
                 self.camera.rebuild_basis();
             }
 
             // Handle camera translation.
             if mouse.rdown {
-                self.camera.position += self.camera.right * offset.x * TRANSLATION_SENSITIVITY;
-                self.camera.position += self.camera.front * offset.y * TRANSLATION_SENSITIVITY;
+                self.camera.position += self.camera.right * offset.x * constants::PREVIEW_TRANSLATION_SENSITIVITY;
+                self.camera.position += self.camera.front * offset.y * constants::PREVIEW_TRANSLATION_SENSITIVITY;
             }
         }
     }

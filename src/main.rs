@@ -11,6 +11,7 @@ extern crate uuid;
 
 mod bounds;
 mod color;
+mod constants;
 mod graph;
 mod interaction;
 mod network;
@@ -44,7 +45,7 @@ use cgmath::{Vector2, Vector3, Vector4, Zero};
 
 fn clear() {
     unsafe {
-        let clear = Color::from_hex(0x2B2B2B, 1.0);
+        let clear = Color::from_hex(constants::NETWORK_BACKGROUND_COLOR, constants::NETWORK_BACKGROUND_ALPHA);
         gl::ClearColor(clear.r, clear.g, clear.b, clear.a);
         gl::Clear(gl::COLOR_BUFFER_BIT);
     }
@@ -53,24 +54,20 @@ fn clear() {
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new()
-        .with_dimensions(1200, 600)
-        .with_title("signed-distance fields");
-    let context = glutin::ContextBuilder::new().with_multisampling(8);
+        .with_dimensions(constants::WINDOW_RESOLUTION.x as u32, constants::WINDOW_RESOLUTION.y as u32)
+        .with_title(constants::WINDOW_TITLE);
+    let context = glutin::ContextBuilder::new().with_multisampling(constants::WINDOW_MULTISAMPLES);
     let gl_window = glutin::GlWindow::new(window, context, &events_loop).unwrap();
     unsafe { gl_window.make_current() }.unwrap();
     gl::load_with(|symbol| gl_window.get_proc_address(symbol) as *const _);
 
-    // Constants
-    const ZOOM_INCREMENT: f32 = 0.05;
-    const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
-    let mut current_size = Vector2::new(1200.0, 600.0);
+    // Keep track of the current window size and interaction state
+    let mut current_size = Vector2::new(constants::WINDOW_RESOLUTION.x, constants::WINDOW_RESOLUTION.y);
+    let mut mouse = MouseInfo::new();
 
     // Main objects
     let mut network = Network::new(current_size);
     let mut builder = ShaderBuilder::new();
-
-    // Store interaction state
-    let mut mouse = MouseInfo::new();
 
     loop {
         events_loop.poll_events(|event| {
@@ -79,19 +76,17 @@ fn main() {
                     glutin::WindowEvent::Closed => (),
 
                     glutin::WindowEvent::Resized(w, h) => {
-                        current_size.x = w as f32;
-                        current_size.y = h as f32;
+                        current_size = Vector2 { x: w as f32, y: h as f32 };
                         gl_window.resize(w, h);
                     }
 
                     glutin::WindowEvent::MouseMoved { position, .. } => {
-                        // Store the current mouse position.
                         mouse.last = mouse.curr;
                         mouse.curr = Vector2::new(position.0 as f32, position.1 as f32);
 
                         // Zero center and zoom.
                         mouse.curr -= current_size * 0.5;
-                        // TODO: mouse.curr *= mouse.scroll;
+                        //mouse.curr *= mouse.scroll;
 
                         network.handle_interaction(&mouse);
                     }
@@ -99,9 +94,9 @@ fn main() {
                     glutin::WindowEvent::MouseWheel { delta, .. } => {
                         if let glutin::MouseScrollDelta::LineDelta(_, line_y) = delta {
                             if line_y == 1.0 {
-                                mouse.scroll -= ZOOM_INCREMENT;
+                                mouse.scroll -= constants::ZOOM_INCREMENT;
                             } else {
-                                mouse.scroll += ZOOM_INCREMENT;
+                                mouse.scroll += constants::ZOOM_INCREMENT;
                             }
                             network.handle_interaction(&mouse);
                         }
@@ -134,51 +129,53 @@ fn main() {
                                     // If the `shift` modifier is down, add a new op.
                                     let family = match key {
                                         glutin::VirtualKeyCode::S => {
-                                            OpFamily::Primitive(PrimitiveType::Sphere)
+                                            Some(OpFamily::Primitive(PrimitiveType::Sphere))
                                         }
                                         glutin::VirtualKeyCode::B => {
-                                            OpFamily::Primitive(PrimitiveType::Box)
+                                            Some(OpFamily::Primitive(PrimitiveType::Box))
                                         }
                                         glutin::VirtualKeyCode::P => {
-                                            OpFamily::Primitive(PrimitiveType::Plane)
+                                            Some(OpFamily::Primitive(PrimitiveType::Plane))
                                         }
                                         glutin::VirtualKeyCode::T => {
-                                            OpFamily::Primitive(PrimitiveType::Torus)
+                                            Some(OpFamily::Primitive(PrimitiveType::Torus))
                                         }
                                         glutin::VirtualKeyCode::U => {
-                                            OpFamily::Primitive(PrimitiveType::Union)
+                                            Some(OpFamily::Primitive(PrimitiveType::Union))
                                         }
                                         glutin::VirtualKeyCode::D => {
-                                            OpFamily::Primitive(PrimitiveType::Subtraction)
+                                            Some(OpFamily::Primitive(PrimitiveType::Subtraction))
                                         }
                                         glutin::VirtualKeyCode::I => {
-                                            OpFamily::Primitive(PrimitiveType::Intersection)
+                                            Some(OpFamily::Primitive(PrimitiveType::Intersection))
                                         }
                                         glutin::VirtualKeyCode::M => {
-                                            OpFamily::Primitive(PrimitiveType::SmoothMinimum)
+                                            Some(OpFamily::Primitive(PrimitiveType::SmoothMinimum))
                                         }
                                         glutin::VirtualKeyCode::R => {
-                                            OpFamily::Primitive(PrimitiveType::Render)
+                                            Some(OpFamily::Primitive(PrimitiveType::Render))
                                         }
                                         glutin::VirtualKeyCode::Key1 => {
-                                            OpFamily::Domain(DomainType::Root)
+                                            Some(OpFamily::Domain(DomainType::Root))
                                         }
                                         glutin::VirtualKeyCode::Key2 => {
-                                            OpFamily::Domain(DomainType::Transform)
+                                            Some(OpFamily::Domain(DomainType::Transform))
                                         }
                                         glutin::VirtualKeyCode::Key3 => {
-                                            OpFamily::Domain(DomainType::Twist)
+                                            Some(OpFamily::Domain(DomainType::Twist))
                                         }
                                         glutin::VirtualKeyCode::Key4 => {
-                                            OpFamily::Domain(DomainType::Bend)
+                                            Some(OpFamily::Domain(DomainType::Bend))
                                         }
-                                        _ => OpFamily::Primitive(PrimitiveType::Sphere),
+                                        _ => None,
                                     };
-                                    network.add_op(
-                                        family,
-                                        mouse.curr - OPERATOR_SIZE * 0.5,
-                                        OPERATOR_SIZE,
-                                    );
+                                    if let Some(family) = family {
+                                        network.add_op(
+                                            family,
+                                            mouse.curr - constants::OPERATOR_SIZE * 0.5,
+                                            constants::OPERATOR_SIZE,
+                                        );
+                                    }
                                 } else {
                                     // Handle other key commands.
                                     match key {

@@ -381,7 +381,16 @@ impl Network {
         }
 
         if let (Some(src), Some(dst)) = (src, dst) {
-            self.add_connection(src, dst);
+            let src_family = self.graph.get_node(src).unwrap().data.family;
+            let dst_family = self.graph.get_node(dst).unwrap().data.family;
+
+            if dst_family.has_inputs() {
+
+                if src_family.can_connect_to(dst_family) {
+                    println!("Valid connection between ops with IDs: {}, {}", src, dst);
+                    self.add_connection(src, dst);
+                }
+            }
         }
 
         self.preview.handle_interaction(&mouse);
