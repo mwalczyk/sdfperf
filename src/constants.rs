@@ -19,6 +19,9 @@ pub const NETWORK_BACKGROUND_ALPHA: f32 = 1.0;
 
 // Operators
 pub const OPERATOR_SIZE: Vector2<f32> = Vector2 { x: 100.0, y: 50.0 };
+pub const OPERATIVE_SLOT_SIZE: Vector2<f32> = Vector2 { x: 12.0, y: 12.0 };
+pub const OPERATOR_ICON_SIZE: Vector2<f32> = Vector2 { x: 40.0, y: 40.0 };
+pub const OPERATOR_ICON_OFFSET: Vector2<f32> = Vector2 { x: 4.0, y: 4.0 };
 
 // Parameters
 pub const PARAMETER_CAPACITY: usize = 4;

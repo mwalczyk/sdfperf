@@ -84,8 +84,24 @@ impl Parameters {
         &mut self.data
     }
 
+    pub fn get_names(&self) -> &[&'static str; constants::PARAMETER_CAPACITY] {
+        &self.names
+    }
+
     pub fn get_index(&self) -> usize {
         self.index
+    }
+
+    pub fn get_min(&self) -> &[f32; constants::PARAMETER_CAPACITY] {
+        &self.min
+    }
+
+    pub fn get_max(&self) -> &[f32; constants::PARAMETER_CAPACITY] {
+        &self.max
+    }
+
+    pub fn get_step(&self) -> &[f32; constants::PARAMETER_CAPACITY] {
+        &self.step
     }
 
     pub fn set_data(&mut self, values: [f32; constants::PARAMETER_CAPACITY]) {
@@ -151,6 +167,8 @@ pub enum DisplacementType {
     Cos,
 }
 
+/// An `OpFamily` (operator family) is a nested enum that designates
+/// the parent type of a particular operator.
 #[derive(Copy, Clone, PartialEq)]
 pub enum OpFamily {
     // TODO: Data,
@@ -421,14 +439,14 @@ impl Op {
         // Set up bounding boxes.
         let bounds_body = Rect::new(position, size);
 
-        let mut bounds_input = Rect::square(Vector2::zero(), 12.0);
+        let mut bounds_input = Rect::new(Vector2::zero(), constants::OPERATIVE_SLOT_SIZE);
         bounds_input.center_on_edge(&bounds_body, Edge::Left);
 
-        let mut bounds_output = Rect::square(Vector2::zero(), 12.0);
+        let mut bounds_output = Rect::new(Vector2::zero(), constants::OPERATIVE_SLOT_SIZE);
         bounds_output.center_on_edge(&bounds_body, Edge::Right);
 
-        let mut bounds_icon = Rect::new(position, Vector2::new(40.0, 40.0));
-        bounds_icon.translate(&Vector2::new(4.0, 4.0));
+        let mut bounds_icon = Rect::new(position, constants::OPERATOR_ICON_SIZE);
+        bounds_icon.translate(&constants::OPERATOR_ICON_OFFSET);
 
         let name = format!("{}_{}", family.to_string(), count);
 
@@ -456,6 +474,9 @@ impl Op {
         self.bounds_icon.translate(offset);
     }
 
+    /// Returns the complete code snippet corresponding to
+    /// this op after it has been connected to `input_a` and
+    /// `input_b` (both of which are optional).
     pub fn get_code(&self, input_a: Option<&str>, input_b: Option<&str>) -> String {
         let mut code = self.family.get_code_template();
         code = code.replace("NAME", &self.name);
@@ -471,10 +492,12 @@ impl Op {
         code
     }
 
+    /// Returns an immutable reference to this op's parameters.
     pub fn get_params(&self) -> &Parameters {
         &self.params
     }
 
+    /// Returns a mutable reference to this op's parameters.
     pub fn get_params_mut(&mut self) -> &mut Parameters {
         &mut self.params
     }

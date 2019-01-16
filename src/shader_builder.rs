@@ -22,6 +22,7 @@ impl ShaderBuilder {
         #version 430
 
         layout (location = 0) in vec2 vs_texcoord;
+
         layout (location = 0) out vec4 o_color;
 
         uniform vec3 u_camera_position;
@@ -125,7 +126,7 @@ impl ShaderBuilder {
 
         vec2 map(in vec3 p)
         {
-            // start of generated cod-
+            // start of generated code
         ";
 
         static FOOTER: &str = "
@@ -195,6 +196,7 @@ impl ShaderBuilder {
         const uint SHADING_AMBIENT_OCCLUSION = 2;
         const uint SHADING_NORMALS = 3;
         const uint SHADING_DIFFUSE = 4;
+
         vec3 shading(in ray r, in result res)
         {
             vec3 hit = r.o + r.d * res.total_distance;
@@ -250,9 +252,9 @@ impl ShaderBuilder {
             // uv-coordinates in the range [-1..1]
             vec2 uv = vs_texcoord * 2.0 - 1.0;
 
-            const float PI = 3.14159265359;
+            const float pi = 3.14159265359;
             const float fov = 50.0;
-            const float fovx = PI * fov / 360.0;
+            const float fovx = pi * fov / 360.0;
             float fovy = fovx * 1.0; // iResolution.y/iResolution.x;
             float ulen = tan(fovx);
             float vlen = tan(fovy);

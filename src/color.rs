@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use cgmath::Vector4;
 
@@ -55,6 +55,30 @@ impl AddAssign for Color {
             self.g + other.g,
             self.b + other.b,
             self.a + other.a,
+        );
+    }
+}
+
+impl Sub for Color {
+    type Output = Color;
+
+    fn sub(self, other: Color) -> Color {
+        Color::new(
+            self.r - other.r,
+            self.g - other.g,
+            self.b - other.b,
+            self.a - other.a,
+        )
+    }
+}
+
+impl SubAssign for Color {
+    fn sub_assign(&mut self, other: Color) {
+        *self = Color::new(
+            self.r - other.r,
+            self.g - other.g,
+            self.b - other.b,
+            self.a - other.a,
         );
     }
 }

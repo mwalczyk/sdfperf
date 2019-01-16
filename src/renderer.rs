@@ -85,12 +85,14 @@ impl Renderer {
 
         layout(location = 0) in vec2 position;
         layout(location = 1) in vec2 texcoord;
+
         layout (location = 0) out vec2 vs_texcoord;
 
         uniform mat4 u_model_matrix;
         uniform mat4 u_projection_matrix;
 
-        void main() {
+        void main()
+        {
             vs_texcoord = texcoord;
 
             gl_Position = u_projection_matrix * u_model_matrix * vec4(position, 0.0, 1.0);
@@ -109,12 +111,15 @@ impl Renderer {
         uniform bool u_use_alpha_map;
 
         layout (location = 0) in vec2 vs_texcoord;
+
         layout (location = 0) out vec4 o_color;
 
         const uint DRAW_MODE_RECTANGLES = 0;
         const uint DRAW_MODE_LINES_SOLID = 1;
         const uint DRAW_MODE_LINES_DASHED = 2;
-        void main() {
+
+        void main()
+        {
             vec2 uv = vs_texcoord;
 
             float alpha = u_draw_color.a;;
@@ -150,6 +155,7 @@ impl Renderer {
         let mut vao = 0;
         let mut vbo_rect = 0;
         let mut vbo_line = 0;
+
         unsafe {
             // Enable alpha blending.
             gl::Enable(gl::BLEND);
@@ -176,11 +182,13 @@ impl Renderer {
             );
 
             // This is not strictly necessary, but we do it for completeness sake.
+            let num_pos_components: i32 = 2;
+            let num_tex_components: i32 = 2;
             let pos_attr =
                 gl::GetAttribLocation(program_draw.id, CString::new("position").unwrap().as_ptr());
             let tex_attr =
                 gl::GetAttribLocation(program_draw.id, CString::new("texcoord").unwrap().as_ptr());
-            let tex_offset = (2 * mem::size_of::<GLfloat>()) as GLuint;
+            let tex_offset = (num_pos_components as usize * mem::size_of::<GLfloat>()) as GLuint;
 
             // Create the VAO and setup vertex attributes.
             gl::CreateVertexArrays(1, &mut vao);
@@ -190,7 +198,7 @@ impl Renderer {
             gl::VertexArrayAttribFormat(
                 vao,
                 pos_attr as GLuint,
-                2,
+                num_pos_components,
                 gl::FLOAT,
                 gl::FALSE as GLboolean,
                 0,
@@ -202,7 +210,7 @@ impl Renderer {
             gl::VertexArrayAttribFormat(
                 vao,
                 tex_attr as GLuint,
-                2,
+                num_tex_components,
                 gl::FLOAT,
                 gl::FALSE as GLboolean,
                 tex_offset,
@@ -215,7 +223,7 @@ impl Renderer {
                 0,
                 vbo_rect,
                 0,
-                (4 * mem::size_of::<GLfloat>()) as i32,
+                ((num_pos_components + num_tex_components) as usize * mem::size_of::<GLfloat>()) as i32,
             );
         }
 
@@ -233,10 +241,12 @@ impl Renderer {
         renderer
     }
 
+    /// Returns the renderer's current projection matrix.
     pub fn get_projection(&self) -> &Matrix4<f32> {
         &self.projection
     }
 
+    /// Returns the internal size (width, height) of the render region.
     pub fn get_size(&self) -> &Vector2<f32> {
         &self.size
     }
@@ -272,6 +282,7 @@ impl Renderer {
             .uniform_matrix_4f("u_projection_matrix", &self.projection);
     }
 
+    /// Draws a primitive.
     pub fn draw(
         &self,
         params: DrawParams,
@@ -328,6 +339,7 @@ impl Renderer {
         self.program_draw.unbind();
     }
 
+    /// Draws a rectangle.
     pub fn draw_rect_inner(&self) {
         unsafe {
             gl::VertexArrayVertexBuffer(
@@ -343,8 +355,10 @@ impl Renderer {
         }
     }
 
+    /// Draws a line (or polyline segment).
     pub fn draw_line_inner(&self, data: &Vec<f32>, connectivity: LineConnectivity) {
         unsafe {
+            // Upload the vertex data.
             let data_size = (data.len() * mem::size_of::<GLfloat>()) as GLsizeiptr;
             gl::NamedBufferSubData(self.vbo_line, 0, data_size, data.as_ptr() as *const c_void);
 
@@ -366,6 +380,8 @@ impl Renderer {
         }
     }
 
+    /// Returns the number of seconds that have elapsed since the program
+    /// was launched.
     fn get_elapsed_seconds(&self) -> f32 {
         let elapsed = self.time.elapsed().unwrap();
         let milliseconds = elapsed.as_secs() * 1000 + elapsed.subsec_nanos() as u64 / 1_000_000;
