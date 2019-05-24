@@ -130,7 +130,30 @@ fn main() {
                     glutin::WindowEvent::KeyboardInput { input, .. } => {
                         if let glutin::ElementState::Pressed = input.state {
                             if let Some(key) = input.virtual_keycode {
-                                if input.modifiers.shift && key != glutin::VirtualKeyCode::LShift {
+                                if input.modifiers.ctrl {
+                                    let family = match key {
+                                        glutin::VirtualKeyCode::Key1 => {
+                                            println!("here");
+                                            OpFamily::Domain(DomainType::Root)
+                                        }
+                                        glutin::VirtualKeyCode::Key2 => {
+                                            OpFamily::Domain(DomainType::Transform)
+                                        }
+                                        glutin::VirtualKeyCode::Key3 => {
+                                            OpFamily::Domain(DomainType::Twist)
+                                        }
+                                        glutin::VirtualKeyCode::Key4 => {
+                                            OpFamily::Domain(DomainType::Bend)
+                                        }
+                                        _ => OpFamily::Primitive(PrimitiveType::Sphere),
+                                    };
+                                    network.add_op(
+                                        family,
+                                        mouse.curr - OPERATOR_SIZE * 0.5,
+                                        OPERATOR_SIZE,
+                                    );
+                                }
+                                else if input.modifiers.shift && key != glutin::VirtualKeyCode::LShift {
                                     // If the `shift` modifier is down, add a new op.
                                     let family = match key {
                                         glutin::VirtualKeyCode::S => {
@@ -159,18 +182,6 @@ fn main() {
                                         }
                                         glutin::VirtualKeyCode::R => {
                                             OpFamily::Primitive(PrimitiveType::Render)
-                                        }
-                                        glutin::VirtualKeyCode::Key1 => {
-                                            OpFamily::Domain(DomainType::Root)
-                                        }
-                                        glutin::VirtualKeyCode::Key2 => {
-                                            OpFamily::Domain(DomainType::Transform)
-                                        }
-                                        glutin::VirtualKeyCode::Key3 => {
-                                            OpFamily::Domain(DomainType::Twist)
-                                        }
-                                        glutin::VirtualKeyCode::Key4 => {
-                                            OpFamily::Domain(DomainType::Bend)
                                         }
                                         _ => OpFamily::Primitive(PrimitiveType::Sphere),
                                     };
