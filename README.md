@@ -15,6 +15,13 @@
 
 Each time a new connection is made, the underlying shader graph is re-built and a new raymarching shader string is generated. 
 
+## Tested On
+- Windows 8.1, Windows 10, Ubuntu 18.04
+- NVIDIA GeForce GTX 970M, NVIDIA GeForce GTX 980
+- Rust compiler version `1.37.0-nightly` (nightly may not be required)
+
+NOTE: this project will only run on graphics cards that support OpenGL [Direct State Access](https://www.khronos.org/opengl/wiki/Direct_State_Access) (DSA).
+
 ## To Build
 1. Clone this repo.
 2. Make sure 🦀 [Rust](https://www.rust-lang.org/en-US/) installed and `cargo` is in your `PATH`.
