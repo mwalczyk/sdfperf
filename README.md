@@ -1,10 +1,23 @@
-# SDFPerf
-A node-based editor for experimenting with signed distance fields and raymarching.
+# sdfperf
+🔌 A node-based editor for experimenting with signed distance fields and raymarching.
 
-<p>
-  <img src="https://github.com/mwalczyk/sdfperf/blob/master/logo.svg" alt="plume logo" width="100" height="auto"/>
+<p align="center">
+  <img src="https://github.com/mwalczyk/sdfperf/blob/master/screenshots/user_interface.gif" width="500" height="auto"/>
 </p>
 
-## Running
-Make sure you have [Rust](https://www.rust-lang.org/en-US/install.html) installed. Navigate inside the directory and
-execute the command: `cargo build --release`. You can then run the application with `cargo run`. 
+## Description
+A work-in-progress node-based editor for creating and manipulating signed-distance fields (SDFs). 
+
+Currently, the system supports basic SDF primitives (spheres, cubes, planes, toruses) as well as basic domain manipulation (translations, scales, bends, twists) and CSG operations (unions, intersections, differences, smooth-minimums). 
+
+Each time a new connection is made, the underlying shader graph is re-built and a new raymarching shader string is generated. 
+
+## To Build
+1. Clone this repo.
+2. Make sure 🦀 [Rust](https://www.rust-lang.org/en-US/) installed and `cargo` is in your `PATH`.
+3. Inside the repo, run: `cargo build --release`.
+
+## To Use
+The UI displays a virtual preview of the final scene, which can be navigated with simple camera controls. Additionally, the user can switch between 5 distinct shading modes with the number keys (1-5): normals, ambient occlusion (AO), diffuse, z-depth, and ray depth.
+
+Certain nodes, such as the `translation` operator, have parameters that can be manipulated with the arrow keys.
